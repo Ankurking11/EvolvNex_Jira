@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getProjects } from '@/lib/actions'
 import ProjectCard from '@/components/ui/ProjectCard'
 import CreateProjectButton from '@/components/ui/CreateProjectButton'
