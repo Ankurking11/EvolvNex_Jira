@@ -22,7 +22,7 @@ export async function getBoardData(projectId: string) {
     return board
   } catch (error) {
     console.error('[getBoardData] Failed to fetch board for project', projectId, error)
-    throw error
+    return null
   }
 }
 
@@ -42,7 +42,7 @@ export async function getProjects() {
     })
   } catch (error) {
     console.error('[getProjects] Failed to fetch projects', error)
-    throw error
+    return []
   }
 }
 
@@ -51,7 +51,7 @@ export async function getUsers() {
     return await prisma.user.findMany({ orderBy: { name: 'asc' } })
   } catch (error) {
     console.error('[getUsers] Failed to fetch users', error)
-    throw error
+    return []
   }
 }
 

@@ -9,9 +9,15 @@ import Link from 'next/link'
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-  })
+  let project = null
+  try {
+    project = await prisma.project.findUnique({
+      where: { id },
+    })
+  } catch (error) {
+    console.error('[ProjectPage] Failed to fetch project', { id }, error)
+    notFound()
+  }
 
   if (!project) notFound()
 
