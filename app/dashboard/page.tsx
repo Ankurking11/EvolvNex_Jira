@@ -7,6 +7,18 @@ import CreateProjectButton from '@/components/ui/CreateProjectButton'
 export default async function DashboardPage() {
   const projects = await getProjects()
 
+  const allTasks = projects.flatMap((p) => p.board?.tasks ?? [])
+  const totalTasks = allTasks.length
+  const { todoCount, inProgressCount, doneCount } = allTasks.reduce(
+    (acc, t) => {
+      if (t.status === 'TODO') acc.todoCount++
+      else if (t.status === 'IN_PROGRESS') acc.inProgressCount++
+      else if (t.status === 'DONE') acc.doneCount++
+      return acc
+    },
+    { todoCount: 0, inProgressCount: 0, doneCount: 0 }
+  )
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4">
@@ -23,8 +35,36 @@ export default async function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Projects</h2>
-          <p className="text-gray-500 mt-1">Manage your projects and track progress</p>
+          <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+          <p className="text-gray-500 mt-1">Overview of your projects and tasks</p>
+        </div>
+
+        {/* Summary stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Projects</p>
+            <p className="text-3xl font-bold text-gray-900">{projects.length}</p>
+          </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">To Do</p>
+            <p className="text-3xl font-bold text-gray-500">{todoCount}</p>
+            <p className="text-xs text-gray-400 mt-1">{totalTasks > 0 ? Math.round((todoCount / totalTasks) * 100) : 0}% of tasks</p>
+          </div>
+          <div className="bg-white rounded-lg border border-blue-100 p-4">
+            <p className="text-xs font-medium text-blue-500 uppercase tracking-wide mb-1">In Progress</p>
+            <p className="text-3xl font-bold text-blue-600">{inProgressCount}</p>
+            <p className="text-xs text-gray-400 mt-1">{totalTasks > 0 ? Math.round((inProgressCount / totalTasks) * 100) : 0}% of tasks</p>
+          </div>
+          <div className="bg-white rounded-lg border border-green-100 p-4">
+            <p className="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">Done</p>
+            <p className="text-3xl font-bold text-green-600">{doneCount}</p>
+            <p className="text-xs text-gray-400 mt-1">{totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0}% of tasks</p>
+          </div>
+        </div>
+
+        <div className="mb-6 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">Projects</h3>
+          <p className="text-sm text-gray-500">{projects.length} {projects.length === 1 ? 'project' : 'projects'}</p>
         </div>
 
         {projects.length === 0 ? (

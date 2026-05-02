@@ -36,6 +36,9 @@ export async function getProjects() {
             _count: {
               select: { tasks: true },
             },
+            tasks: {
+              select: { status: true },
+            },
           },
         },
       },
