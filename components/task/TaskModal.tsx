@@ -50,11 +50,13 @@ export default function TaskModal({
   const [assigneeId, setAssigneeId] = useState(task?.assigneeId ?? '')
   const [loading, setLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
     setLoading(true)
+    setError(null)
     try {
       if (mode === 'create' && boardId) {
         const created = await createTask({
@@ -76,6 +78,9 @@ export default function TaskModal({
         })
         onSave(updated)
       }
+    } catch (err) {
+      console.error('[TaskModal] Failed to save task', err)
+      setError(mode === 'create' ? 'Failed to create task. Please try again.' : 'Failed to save changes. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -84,9 +89,13 @@ export default function TaskModal({
   const handleDelete = async () => {
     if (!task) return
     setLoading(true)
+    setError(null)
     try {
       await deleteTask(task.id)
       onDelete?.()
+    } catch (err) {
+      console.error('[TaskModal] Failed to delete task', err)
+      setError('Failed to delete task. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -107,6 +116,11 @@ export default function TaskModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
             <input

@@ -9,18 +9,23 @@ export default function CreateProjectButton() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
     setLoading(true)
+    setError(null)
     try {
       await createProject({ name: name.trim(), description: description.trim() || undefined })
       setName('')
       setDescription('')
       setIsOpen(false)
       router.refresh()
+    } catch (err) {
+      console.error('[CreateProjectButton] Failed to create project', err)
+      setError('Failed to create project. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -51,6 +56,11 @@ export default function CreateProjectButton() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {error && (
+                <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  {error}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>
                 <input

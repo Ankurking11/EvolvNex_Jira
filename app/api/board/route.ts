@@ -7,19 +7,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'projectId required' }, { status: 400 })
   }
 
-  const board = await prisma.board.findFirst({
-    where: { projectId },
-    include: {
-      tasks: {
-        include: { assignee: true },
-        orderBy: { createdAt: 'asc' },
+  try {
+    const board = await prisma.board.findFirst({
+      where: { projectId },
+      include: {
+        tasks: {
+          include: { assignee: true },
+          orderBy: { createdAt: 'asc' },
+        },
       },
-    },
-  })
+    })
 
-  if (!board) {
-    return NextResponse.json({ error: 'Board not found' }, { status: 404 })
+    if (!board) {
+      return NextResponse.json({ error: 'Board not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(board)
+  } catch (error) {
+    console.error('[GET /api/board] Failed to fetch board for project', projectId, error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  return NextResponse.json(board)
 }
