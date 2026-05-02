@@ -66,8 +66,8 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
             setTasks(data.tasks)
           }
         }
-      } catch (_e) {
-        console.warn('Board polling error:', _e)
+      } catch (error) {
+        console.warn('Board polling error:', error)
       }
     }, 5000)
     return () => clearInterval(interval)
@@ -114,7 +114,8 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
 
     try {
       await moveTask(taskId, newStatus)
-    } catch (_e) {
+    } catch (error) {
+      console.error('Failed to move task:', error)
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t)))
       setMoveError('Failed to move task. Please try again.')
       setTimeout(() => setMoveError(null), 3000)
