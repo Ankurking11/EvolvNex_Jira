@@ -54,6 +54,7 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
 export default function BoardClient({ board, users, projectId }: BoardClientProps) {
   const [tasks, setTasks] = useState<Task[]>(board.tasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [moveError, setMoveError] = useState<string | null>(null)
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -66,7 +67,7 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
           }
         }
       } catch (_e) {
-        // ignore polling errors
+        console.warn('Board polling error:', _e)
       }
     }, 5000)
     return () => clearInterval(interval)
@@ -115,6 +116,8 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
       await moveTask(taskId, newStatus)
     } catch (_e) {
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t)))
+      setMoveError('Failed to move task. Please try again.')
+      setTimeout(() => setMoveError(null), 3000)
     }
   }
 
@@ -137,6 +140,11 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
+      {moveError && (
+        <div className="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50">
+          {moveError}
+        </div>
+      )}
       <div className="h-full overflow-x-auto">
         <div className="flex gap-4 p-4 sm:p-6 h-full min-w-max">
           {COLUMNS.map((col) => (
