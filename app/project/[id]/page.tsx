@@ -4,14 +4,16 @@ import { prisma } from '@/lib/prisma'
 import BoardClient from '@/components/board/BoardClient'
 import Link from 'next/link'
 
-export default async function ProjectPage({ params }: { params: { id: string } }) {
+export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+
   const project = await prisma.project.findUnique({
-    where: { id: params.id },
+    where: { id },
   })
 
   if (!project) notFound()
 
-  const board = await getBoardData(params.id)
+  const board = await getBoardData(id)
   const users = await getUsers()
 
   if (!board) notFound()
@@ -42,7 +44,7 @@ export default async function ProjectPage({ params }: { params: { id: string } }
       </header>
 
       <div className="flex-1 overflow-hidden">
-        <BoardClient board={board} users={users} projectId={params.id} />
+        <BoardClient board={board} users={users} projectId={id} />
       </div>
     </div>
   )
