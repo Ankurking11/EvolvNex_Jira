@@ -6,6 +6,11 @@ import { revalidatePath } from 'next/cache'
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE'
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 
+function revalidateProjectViews(projectId: string) {
+  revalidatePath('/dashboard')
+  revalidatePath(`/project/${projectId}`)
+}
+
 export async function getBoardData(projectId: string) {
   try {
     const board = await prisma.board.findFirst({
@@ -69,9 +74,14 @@ export async function createTask(data: {
   try {
     const task = await prisma.task.create({
       data,
-      include: { assignee: true },
+      include: {
+        assignee: true,
+        board: {
+          select: { projectId: true },
+        },
+      },
     })
-    revalidatePath('/')
+    revalidateProjectViews(task.board.projectId)
     return task
   } catch (error) {
     console.error('[createTask] Failed to create task', { boardId: data.boardId, title: data.title }, error)
@@ -93,9 +103,14 @@ export async function updateTask(
     const task = await prisma.task.update({
       where: { id: taskId },
       data,
-      include: { assignee: true },
+      include: {
+        assignee: true,
+        board: {
+          select: { projectId: true },
+        },
+      },
     })
-    revalidatePath('/')
+    revalidateProjectViews(task.board.projectId)
     return task
   } catch (error) {
     console.error('[updateTask] Failed to update task', { taskId }, error)
@@ -105,8 +120,20 @@ export async function updateTask(
 
 export async function deleteTask(taskId: string) {
   try {
+    const existingTask = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: {
+        board: {
+          select: { projectId: true },
+        },
+      },
+    })
+
     await prisma.task.delete({ where: { id: taskId } })
-    revalidatePath('/')
+
+    if (existingTask?.board.projectId) {
+      revalidateProjectViews(existingTask.board.projectId)
+    }
   } catch (error) {
     console.error('[deleteTask] Failed to delete task', { taskId }, error)
     throw error
@@ -118,9 +145,14 @@ export async function moveTask(taskId: string, newStatus: TaskStatus) {
     const task = await prisma.task.update({
       where: { id: taskId },
       data: { status: newStatus },
-      include: { assignee: true },
+      include: {
+        assignee: true,
+        board: {
+          select: { projectId: true },
+        },
+      },
     })
-    revalidatePath('/')
+    revalidateProjectViews(task.board.projectId)
     return task
   } catch (error) {
     console.error('[moveTask] Failed to move task', { taskId, newStatus }, error)
@@ -136,7 +168,8 @@ export async function createProject(data: { name: string; description?: string }
         board: { create: {} },
       },
     })
-    revalidatePath('/')
+    revalidatePath('/dashboard')
+    revalidatePath(`/project/${project.id}`)
     return project
   } catch (error) {
     console.error('[createProject] Failed to create project', { name: data.name }, error)

@@ -18,8 +18,8 @@ type Task = {
   assigneeId: string | null
   assignee: User | null
   boardId: string
-  createdAt: Date
-  updatedAt: Date
+  createdAt: string | Date
+  updatedAt: string | Date
 }
 
 interface TaskModalProps {
