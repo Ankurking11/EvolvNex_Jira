@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { TaskStatus } from '@/lib/actions'
@@ -44,7 +44,7 @@ const STATUS_BADGE: Record<string, string> = {
   DONE: 'bg-green-100 text-green-700',
 }
 
-export default function Column({
+function Column({
   id,
   label,
   color,
@@ -105,7 +105,7 @@ export default function Column({
           users={users}
           onClose={() => setShowModal(false)}
           onSave={(task) => {
-            onTaskCreate(task as Task)
+            onTaskCreate(task)
             setShowModal(false)
           }}
         />
@@ -113,3 +113,5 @@ export default function Column({
     </div>
   )
 }
+
+export default memo(Column)

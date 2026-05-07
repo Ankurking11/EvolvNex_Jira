@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -110,36 +110,78 @@ function parseBoardTasks(data: unknown): Task[] | null {
   return parsedTasks
 }
 
+function hasTaskListChanged(previous: Task[], next: Task[]) {
+  if (previous.length !== next.length) return true
+
+  const previousMap = new Map(
+    previous.map((task) => [
+      task.id,
+      `${task.status}|${task.priority}|${task.assigneeId ?? ''}|${String(task.updatedAt)}`,
+    ])
+  )
+
+  for (const task of next) {
+    const snapshot = `${task.status}|${task.priority}|${task.assigneeId ?? ''}|${String(task.updatedAt)}`
+    if (previousMap.get(task.id) !== snapshot) return true
+  }
+
+  return false
+}
+
 export default function BoardClient({ board, users, projectId }: BoardClientProps) {
   const [tasks, setTasks] = useState<Task[]>(board.tasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [isRealtimeHealthy, setIsRealtimeHealthy] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const latestRefreshRequest = useRef(0)
+  const moveErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const supabase = useMemo(() => getSupabaseBrowserClient(), [])
 
   const refreshBoard = useCallback(async () => {
+    const requestId = ++latestRefreshRequest.current
+    setIsRefreshing(true)
+
     try {
       const res = await fetch(`/api/board?projectId=${projectId}`, { cache: 'no-store' })
-      if (!res.ok) return
+      if (!res.ok) throw new Error(`Failed to refresh board (${res.status})`)
+
       const data: unknown = await res.json()
       const parsedTasks = parseBoardTasks(data)
-      if (parsedTasks) setTasks(parsedTasks)
+
+      if (requestId !== latestRefreshRequest.current || !parsedTasks) return
+
+      setTasks((previous) => (hasTaskListChanged(previous, parsedTasks) ? parsedTasks : previous))
+      setSyncError(null)
     } catch (error) {
       console.warn('Board polling error:', error)
+      setSyncError('Board sync is delayed. Retrying automatically.')
+    } finally {
+      if (requestId === latestRefreshRequest.current) {
+        setIsRefreshing(false)
+      }
     }
   }, [projectId])
 
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient()
-    if (supabase) return
+    if (supabase && isRealtimeHealthy) return
+
+    const kickoffRefresh = setTimeout(() => {
+      void refreshBoard()
+    }, 0)
 
     const interval = setInterval(() => {
       void refreshBoard()
     }, 20000)
 
-    return () => clearInterval(interval)
-  }, [refreshBoard])
+    return () => {
+      clearTimeout(kickoffRefresh)
+      clearInterval(interval)
+    }
+  }, [refreshBoard, isRealtimeHealthy, supabase])
 
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient()
     if (!supabase) return
 
     const channel = supabase
@@ -151,12 +193,33 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
           void refreshBoard()
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setIsRealtimeHealthy(true)
+          setSyncError(null)
+          return
+        }
+
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setIsRealtimeHealthy(false)
+          setSyncError('Realtime disconnected. Falling back to periodic refresh.')
+        }
+      })
 
     return () => {
+      setIsRealtimeHealthy(false)
       void supabase.removeChannel(channel)
     }
-  }, [board.id, refreshBoard])
+  }, [board.id, refreshBoard, supabase])
+
+  useEffect(
+    () => () => {
+      if (moveErrorTimer.current) {
+        clearTimeout(moveErrorTimer.current)
+      }
+    },
+    []
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -174,17 +237,26 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
     })
   )
 
-  const getTasksByStatus = useCallback(
-    (status: string) => tasks.filter((t) => t.status === status),
+  const tasksByStatus = useMemo(
+    () =>
+      tasks.reduce<Record<TaskStatus, Task[]>>(
+        (grouped, task) => {
+          if (task.status === 'TODO' || task.status === 'IN_PROGRESS' || task.status === 'DONE') {
+            grouped[task.status].push(task)
+          }
+          return grouped
+        },
+        { TODO: [], IN_PROGRESS: [], DONE: [] }
+      ),
     [tasks]
   )
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const task = tasks.find((t) => t.id === event.active.id)
     setActiveTask(task ?? null)
-  }
+  }, [tasks])
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveTask(null)
     const { active, over } = event
     if (!over) return
@@ -214,21 +286,32 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
       console.error('Failed to move task:', error)
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t)))
       setMoveError('Failed to move task. Please try again.')
-      setTimeout(() => setMoveError(null), 3000)
+      if (moveErrorTimer.current) {
+        clearTimeout(moveErrorTimer.current)
+      }
+      moveErrorTimer.current = setTimeout(() => setMoveError(null), 3000)
     }
-  }
+  }, [tasks])
 
-  const handleTaskUpdate = (updatedTask: Task) => {
-    setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)))
-  }
+  const handleTaskUpdate = useCallback((updatedTask: Task) => {
+    setTasks((prev) => {
+      const existingTaskIndex = prev.findIndex((task) => task.id === updatedTask.id)
+      if (existingTaskIndex < 0) return [...prev, updatedTask]
+      return prev.map((task) => (task.id === updatedTask.id ? updatedTask : task))
+    })
+  }, [])
 
-  const handleTaskDelete = (taskId: string) => {
+  const handleTaskDelete = useCallback((taskId: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId))
-  }
+  }, [])
 
-  const handleTaskCreate = (newTask: Task) => {
-    setTasks((prev) => [...prev, newTask])
-  }
+  const handleTaskCreate = useCallback((newTask: Task) => {
+    setTasks((prev) => {
+      const existingTaskIndex = prev.findIndex((task) => task.id === newTask.id)
+      if (existingTaskIndex < 0) return [...prev, newTask]
+      return prev.map((task) => (task.id === newTask.id ? newTask : task))
+    })
+  }, [])
 
   return (
     <DndContext
@@ -242,15 +325,25 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
           {moveError}
         </div>
       )}
+      {syncError && (
+        <div className="fixed top-4 right-4 bg-amber-100 border border-amber-300 text-amber-800 px-4 py-2 rounded-lg shadow text-xs sm:text-sm z-50">
+          {syncError}
+        </div>
+      )}
       <div className="h-full overflow-x-auto">
         <div className="flex gap-4 p-4 sm:p-6 h-full min-w-max">
+          {isRefreshing && (
+            <div className="fixed right-4 top-16 text-xs text-gray-500 bg-white/90 rounded px-2 py-1 border border-gray-200 z-40">
+              Syncing…
+            </div>
+          )}
           {COLUMNS.map((col) => (
             <Column
               key={col.id}
               id={col.id}
               label={col.label}
               color={col.color}
-              tasks={getTasksByStatus(col.id)}
+              tasks={tasksByStatus[col.id]}
               users={users}
               boardId={board.id}
               onTaskUpdate={handleTaskUpdate}

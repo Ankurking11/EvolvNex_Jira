@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import TaskModal from './TaskModal'
@@ -42,7 +42,7 @@ function getInitials(name: string) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-export default function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps) {
+function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps) {
   const [showModal, setShowModal] = useState(false)
   
   const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging } = useSortable({
@@ -114,7 +114,7 @@ export default function TaskCard({ task, users, onUpdate, onDelete, isDragging }
           users={users}
           onClose={() => setShowModal(false)}
           onSave={(updated) => {
-            onUpdate(updated as Task)
+            onUpdate(updated)
             setShowModal(false)
           }}
           onDelete={() => {
@@ -126,3 +126,5 @@ export default function TaskCard({ task, users, onUpdate, onDelete, isDragging }
     </>
   )
 }
+
+export default memo(TaskCard)
