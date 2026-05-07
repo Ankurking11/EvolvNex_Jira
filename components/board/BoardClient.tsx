@@ -128,6 +128,9 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
   }, [projectId])
 
   useEffect(() => {
+    const supabase = getSupabaseBrowserClient()
+    if (supabase) return
+
     const interval = setInterval(() => {
       void refreshBoard()
     }, 20000)
@@ -161,6 +164,7 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
+        // Delay and tolerance prevent accidental drags while scrolling on touch devices.
         delay: 200,
         tolerance: 6,
       },

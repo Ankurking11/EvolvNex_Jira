@@ -120,20 +120,16 @@ export async function updateTask(
 
 export async function deleteTask(taskId: string) {
   try {
-    const existingTask = await prisma.task.findUnique({
+    const deletedTask = await prisma.task.delete({
       where: { id: taskId },
-      select: {
+      include: {
         board: {
           select: { projectId: true },
         },
       },
     })
 
-    await prisma.task.delete({ where: { id: taskId } })
-
-    if (existingTask?.board.projectId) {
-      revalidateProjectViews(existingTask.board.projectId)
-    }
+    revalidateProjectViews(deletedTask.board.projectId)
   } catch (error) {
     console.error('[deleteTask] Failed to delete task', { taskId }, error)
     throw error
