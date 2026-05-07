@@ -187,7 +187,7 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
       .channel(`board:${board.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'Task', filter: `boardId=eq.${board.id}` },
+        { event: '*', schema: 'public', table: 'tasks', filter: `board_id=eq.${board.id}` },
         () => {
           void refreshBoard()
         }
