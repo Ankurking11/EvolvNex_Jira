@@ -9,7 +9,7 @@ export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 /**
  * Keeps dashboard aggregate cards and the project board page in sync after task mutations.
  */
-function revalidateProjectViews(projectId: string) {
+function revalidateProjectAndDashboard(projectId: string) {
   revalidatePath('/dashboard')
   revalidatePath(`/project/${projectId}`)
 }
@@ -84,7 +84,7 @@ export async function createTask(data: {
         },
       },
     })
-    revalidateProjectViews(task.board.projectId)
+    revalidateProjectAndDashboard(task.board.projectId)
     return task
   } catch (error) {
     console.error('[createTask] Failed to create task', { boardId: data.boardId, title: data.title }, error)
@@ -113,7 +113,7 @@ export async function updateTask(
         },
       },
     })
-    revalidateProjectViews(task.board.projectId)
+    revalidateProjectAndDashboard(task.board.projectId)
     return task
   } catch (error) {
     console.error('[updateTask] Failed to update task', { taskId }, error)
@@ -132,7 +132,7 @@ export async function deleteTask(taskId: string) {
       },
     })
 
-    revalidateProjectViews(deletedTask.board.projectId)
+    revalidateProjectAndDashboard(deletedTask.board.projectId)
   } catch (error) {
     console.error('[deleteTask] Failed to delete task', { taskId }, error)
     throw error
@@ -151,7 +151,7 @@ export async function moveTask(taskId: string, newStatus: TaskStatus) {
         },
       },
     })
-    revalidateProjectViews(task.board.projectId)
+    revalidateProjectAndDashboard(task.board.projectId)
     return task
   } catch (error) {
     console.error('[moveTask] Failed to move task', { taskId, newStatus }, error)
@@ -167,7 +167,7 @@ export async function createProject(data: { name: string; description?: string }
         board: { create: {} },
       },
     })
-    revalidateProjectViews(project.id)
+    revalidateProjectAndDashboard(project.id)
     return project
   } catch (error) {
     console.error('[createProject] Failed to create project', { name: data.name }, error)

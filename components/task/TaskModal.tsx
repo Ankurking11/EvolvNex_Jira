@@ -94,7 +94,7 @@ export default function TaskModal({
             onClick={onClose}
             disabled={loading}
             className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="Close task modal"
+            aria-label={`Close ${mode === 'create' ? 'new task' : 'edit task'} modal`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

@@ -1,6 +1,7 @@
 'use client'
 
 export default function ProjectError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string }
@@ -13,6 +14,9 @@ export default function ProjectError({
         <p className="text-sm text-gray-600 mb-4">
           The board data is temporarily unavailable. Please try again.
         </p>
+        {error.message && (
+          <p className="text-xs text-gray-500 mb-4 break-words">Details: {error.message}</p>
+        )}
         <button
           onClick={reset}
           className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"

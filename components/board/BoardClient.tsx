@@ -21,6 +21,8 @@ import Column from './Column'
 import TaskCard from '../task/TaskCard'
 
 const POLLING_INTERVAL_MS = 20000
+const TOUCH_ACTIVATION_DELAY_MS = 150
+const TOUCH_ACTIVATION_TOLERANCE_PX = 6
 
 interface BoardClientProps {
   board: BoardData
@@ -119,6 +121,10 @@ function upsertTask(previousTasks: BoardTask[], nextTask: BoardTask) {
   return updatedTasks
 }
 
+function updateTasksIfChanged(previous: BoardTask[], next: BoardTask[]) {
+  return hasTaskListChanged(previous, next) ? next : previous
+}
+
 export default function BoardClient({ board, users, projectId }: BoardClientProps) {
   const [tasks, setTasks] = useState<BoardTask[]>(board.tasks)
   const [activeTask, setActiveTask] = useState<BoardTask | null>(null)
@@ -135,7 +141,9 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
     setIsRefreshing(true)
 
     try {
-      const res = await fetch(`/api/board?projectId=${projectId}`, { cache: 'no-store' })
+      const res = await fetch(`/api/board?projectId=${encodeURIComponent(projectId)}`, {
+        headers: { 'cache-control': 'no-cache' },
+      })
       if (!res.ok) throw new Error(`Failed to refresh board (${res.status})`)
 
       const data: unknown = await res.json()
@@ -143,7 +151,7 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
 
       if (requestId !== latestRefreshRequest.current || !parsedTasks) return
 
-      setTasks((previous) => (hasTaskListChanged(previous, parsedTasks) ? parsedTasks : previous))
+      setTasks((previous) => updateTasksIfChanged(previous, parsedTasks))
       setSyncError(null)
     } catch (error) {
       console.warn('Board polling error:', error)
@@ -219,8 +227,8 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
     useSensor(TouchSensor, {
       activationConstraint: {
         // Delay and tolerance prevent accidental drags while scrolling on touch devices.
-        delay: 150,
-        tolerance: 6,
+        delay: TOUCH_ACTIVATION_DELAY_MS,
+        tolerance: TOUCH_ACTIVATION_TOLERANCE_PX,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -232,7 +240,7 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
     () =>
       tasks.reduce<Record<TaskStatus, BoardTask[]>>(
         (grouped, task) => {
-          if (task.status === 'TODO' || task.status === 'IN_PROGRESS' || task.status === 'DONE') {
+          if (isTaskStatus(task.status)) {
             grouped[task.status].push(task)
           }
           return grouped
