@@ -15,37 +15,16 @@ import {
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { moveTask, TaskStatus } from '@/lib/actions'
+import { BoardData, BoardTask, BoardUser } from '@/lib/board-types'
 import { getSupabaseBrowserClient } from '@/lib/supabase'
 import Column from './Column'
 import TaskCard from '../task/TaskCard'
 
-type User = {
-  id: string
-  name: string
-  email: string
-}
-
-type Task = {
-  id: string
-  title: string
-  description: string | null
-  status: string
-  priority: string
-  assigneeId: string | null
-  assignee: User | null
-  boardId: string
-  createdAt: string | Date
-  updatedAt: string | Date
-}
-
-type Board = {
-  id: string
-  tasks: Task[]
-}
+const POLLING_INTERVAL_MS = 20000
 
 interface BoardClientProps {
-  board: Board
-  users: User[]
+  board: BoardData
+  users: BoardUser[]
   projectId: string
 }
 
@@ -59,16 +38,16 @@ function isTaskStatus(value: unknown): value is TaskStatus {
   return value === 'TODO' || value === 'IN_PROGRESS' || value === 'DONE'
 }
 
-function parseBoardTasks(data: unknown): Task[] | null {
+function parseBoardTasks(data: unknown): BoardTask[] | null {
   if (!data || typeof data !== 'object' || !('tasks' in data)) return null
 
   const tasks = (data as { tasks?: unknown }).tasks
   if (!Array.isArray(tasks)) return null
 
-  const parsedTasks: Task[] = []
+  const parsedTasks: BoardTask[] = []
   for (const task of tasks) {
     if (!task || typeof task !== 'object') return null
-    const candidate = task as Partial<Task>
+    const candidate = task as Partial<BoardTask>
     if (
       typeof candidate.id !== 'string' ||
       typeof candidate.title !== 'string' ||
@@ -110,27 +89,39 @@ function parseBoardTasks(data: unknown): Task[] | null {
   return parsedTasks
 }
 
-function hasTaskListChanged(previous: Task[], next: Task[]) {
+function hasTaskListChanged(previous: BoardTask[], next: BoardTask[]) {
   if (previous.length !== next.length) return true
 
-  const previousMap = new Map(
-    previous.map((task) => [
-      task.id,
-      `${task.status}|${task.priority}|${task.assigneeId ?? ''}|${String(task.updatedAt)}`,
-    ])
-  )
+  const previousMap = new Map(previous.map((task) => [task.id, task]))
 
   for (const task of next) {
-    const snapshot = `${task.status}|${task.priority}|${task.assigneeId ?? ''}|${String(task.updatedAt)}`
-    if (previousMap.get(task.id) !== snapshot) return true
+    const previousTask = previousMap.get(task.id)
+    if (
+      !previousTask ||
+      previousTask.status !== task.status ||
+      previousTask.priority !== task.priority ||
+      previousTask.assigneeId !== task.assigneeId ||
+      String(previousTask.updatedAt) !== String(task.updatedAt)
+    ) {
+      return true
+    }
   }
 
   return false
 }
 
+function upsertTask(previousTasks: BoardTask[], nextTask: BoardTask) {
+  const existingTaskIndex = previousTasks.findIndex((task) => task.id === nextTask.id)
+  if (existingTaskIndex < 0) return [...previousTasks, nextTask]
+
+  const updatedTasks = [...previousTasks]
+  updatedTasks[existingTaskIndex] = nextTask
+  return updatedTasks
+}
+
 export default function BoardClient({ board, users, projectId }: BoardClientProps) {
-  const [tasks, setTasks] = useState<Task[]>(board.tasks)
-  const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [tasks, setTasks] = useState<BoardTask[]>(board.tasks)
+  const [activeTask, setActiveTask] = useState<BoardTask | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [isRealtimeHealthy, setIsRealtimeHealthy] = useState(false)
@@ -173,7 +164,7 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
 
     const interval = setInterval(() => {
       void refreshBoard()
-    }, 20000)
+    }, POLLING_INTERVAL_MS)
 
     return () => {
       clearTimeout(kickoffRefresh)
@@ -228,7 +219,7 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
     useSensor(TouchSensor, {
       activationConstraint: {
         // Delay and tolerance prevent accidental drags while scrolling on touch devices.
-        delay: 200,
+        delay: 150,
         tolerance: 6,
       },
     }),
@@ -239,7 +230,7 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
 
   const tasksByStatus = useMemo(
     () =>
-      tasks.reduce<Record<TaskStatus, Task[]>>(
+      tasks.reduce<Record<TaskStatus, BoardTask[]>>(
         (grouped, task) => {
           if (task.status === 'TODO' || task.status === 'IN_PROGRESS' || task.status === 'DONE') {
             grouped[task.status].push(task)
@@ -293,24 +284,16 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
     }
   }, [tasks])
 
-  const handleTaskUpdate = useCallback((updatedTask: Task) => {
-    setTasks((prev) => {
-      const existingTaskIndex = prev.findIndex((task) => task.id === updatedTask.id)
-      if (existingTaskIndex < 0) return [...prev, updatedTask]
-      return prev.map((task) => (task.id === updatedTask.id ? updatedTask : task))
-    })
+  const handleTaskUpdate = useCallback((updatedTask: BoardTask) => {
+    setTasks((prev) => upsertTask(prev, updatedTask))
   }, [])
 
   const handleTaskDelete = useCallback((taskId: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId))
   }, [])
 
-  const handleTaskCreate = useCallback((newTask: Task) => {
-    setTasks((prev) => {
-      const existingTaskIndex = prev.findIndex((task) => task.id === newTask.id)
-      if (existingTaskIndex < 0) return [...prev, newTask]
-      return prev.map((task) => (task.id === newTask.id ? newTask : task))
-    })
+  const handleTaskCreate = useCallback((newTask: BoardTask) => {
+    setTasks((prev) => upsertTask(prev, newTask))
   }, [])
 
   return (

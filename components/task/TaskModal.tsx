@@ -2,34 +2,16 @@
 
 import { useState } from 'react'
 import { TaskStatus, TaskPriority, createTask, updateTask, deleteTask } from '@/lib/actions'
-
-type User = {
-  id: string
-  name: string
-  email: string
-}
-
-type Task = {
-  id: string
-  title: string
-  description: string | null
-  status: string
-  priority: string
-  assigneeId: string | null
-  assignee: User | null
-  boardId: string
-  createdAt: string | Date
-  updatedAt: string | Date
-}
+import { BoardTask, BoardUser } from '@/lib/board-types'
 
 interface TaskModalProps {
   mode: 'create' | 'edit'
-  task?: Task
+  task?: BoardTask
   defaultStatus?: TaskStatus
   boardId?: string
-  users: User[]
+  users: BoardUser[]
   onClose: () => void
-  onSave: (task: Task) => void
+  onSave: (task: BoardTask) => void
   onDelete?: () => void
 }
 

@@ -6,6 +6,9 @@ import { revalidatePath } from 'next/cache'
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE'
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 
+/**
+ * Keeps dashboard aggregate cards and the project board page in sync after task mutations.
+ */
 function revalidateProjectViews(projectId: string) {
   revalidatePath('/dashboard')
   revalidatePath(`/project/${projectId}`)
@@ -164,8 +167,7 @@ export async function createProject(data: { name: string; description?: string }
         board: { create: {} },
       },
     })
-    revalidatePath('/dashboard')
-    revalidatePath(`/project/${project.id}`)
+    revalidateProjectViews(project.id)
     return project
   } catch (error) {
     console.error('[createProject] Failed to create project', { name: data.name }, error)

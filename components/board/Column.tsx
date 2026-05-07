@@ -4,38 +4,20 @@ import { memo, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { TaskStatus } from '@/lib/actions'
+import { BoardTask, BoardUser } from '@/lib/board-types'
 import TaskCard from '../task/TaskCard'
 import TaskModal from '../task/TaskModal'
-
-type User = {
-  id: string
-  name: string
-  email: string
-}
-
-type Task = {
-  id: string
-  title: string
-  description: string | null
-  status: string
-  priority: string
-  assigneeId: string | null
-  assignee: User | null
-  boardId: string
-  createdAt: string | Date
-  updatedAt: string | Date
-}
 
 interface ColumnProps {
   id: TaskStatus
   label: string
   color: string
-  tasks: Task[]
-  users: User[]
+  tasks: BoardTask[]
+  users: BoardUser[]
   boardId: string
-  onTaskUpdate: (task: Task) => void
+  onTaskUpdate: (task: BoardTask) => void
   onTaskDelete: (taskId: string) => void
-  onTaskCreate: (task: Task) => void
+  onTaskCreate: (task: BoardTask) => void
 }
 
 const STATUS_BADGE: Record<string, string> = {
