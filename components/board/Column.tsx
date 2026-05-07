@@ -1,41 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { TaskStatus } from '@/lib/actions'
+import { BoardTask, BoardUser } from '@/lib/board-types'
 import TaskCard from '../task/TaskCard'
 import TaskModal from '../task/TaskModal'
-
-type User = {
-  id: string
-  name: string
-  email: string
-}
-
-type Task = {
-  id: string
-  title: string
-  description: string | null
-  status: string
-  priority: string
-  assigneeId: string | null
-  assignee: User | null
-  boardId: string
-  createdAt: Date
-  updatedAt: Date
-}
 
 interface ColumnProps {
   id: TaskStatus
   label: string
   color: string
-  tasks: Task[]
-  users: User[]
+  tasks: BoardTask[]
+  users: BoardUser[]
   boardId: string
-  onTaskUpdate: (task: Task) => void
+  onTaskUpdate: (task: BoardTask) => void
   onTaskDelete: (taskId: string) => void
-  onTaskCreate: (task: Task) => void
+  onTaskCreate: (task: BoardTask) => void
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -44,7 +26,7 @@ const STATUS_BADGE: Record<string, string> = {
   DONE: 'bg-green-100 text-green-700',
 }
 
-export default function Column({
+function Column({
   id,
   label,
   color,
@@ -105,7 +87,7 @@ export default function Column({
           users={users}
           onClose={() => setShowModal(false)}
           onSave={(task) => {
-            onTaskCreate(task as Task)
+            onTaskCreate(task)
             setShowModal(false)
           }}
         />
@@ -113,3 +95,5 @@ export default function Column({
     </div>
   )
 }
+
+export default memo(Column)

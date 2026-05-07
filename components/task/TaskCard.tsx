@@ -1,33 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { BoardTask, BoardUser } from '@/lib/board-types'
 import TaskModal from './TaskModal'
 
-type User = {
-  id: string
-  name: string
-  email: string
-}
-
-type Task = {
-  id: string
-  title: string
-  description: string | null
-  status: string
-  priority: string
-  assigneeId: string | null
-  assignee: User | null
-  boardId: string
-  createdAt: Date
-  updatedAt: Date
-}
-
 interface TaskCardProps {
-  task: Task
-  users: User[]
-  onUpdate: (task: Task) => void
+  task: BoardTask
+  users: BoardUser[]
+  onUpdate: (task: BoardTask) => void
   onDelete: (taskId: string) => void
   isDragging?: boolean
 }
@@ -42,7 +24,7 @@ function getInitials(name: string) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-export default function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps) {
+function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps) {
   const [showModal, setShowModal] = useState(false)
   
   const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging } = useSortable({
@@ -114,7 +96,7 @@ export default function TaskCard({ task, users, onUpdate, onDelete, isDragging }
           users={users}
           onClose={() => setShowModal(false)}
           onSave={(updated) => {
-            onUpdate(updated as Task)
+            onUpdate(updated)
             setShowModal(false)
           }}
           onDelete={() => {
@@ -126,3 +108,5 @@ export default function TaskCard({ task, users, onUpdate, onDelete, isDragging }
     </>
   )
 }
+
+export default memo(TaskCard)

@@ -2,34 +2,16 @@
 
 import { useState } from 'react'
 import { TaskStatus, TaskPriority, createTask, updateTask, deleteTask } from '@/lib/actions'
-
-type User = {
-  id: string
-  name: string
-  email: string
-}
-
-type Task = {
-  id: string
-  title: string
-  description: string | null
-  status: string
-  priority: string
-  assigneeId: string | null
-  assignee: User | null
-  boardId: string
-  createdAt: Date
-  updatedAt: Date
-}
+import { BoardTask, BoardUser } from '@/lib/board-types'
 
 interface TaskModalProps {
   mode: 'create' | 'edit'
-  task?: Task
+  task?: BoardTask
   defaultStatus?: TaskStatus
   boardId?: string
-  users: User[]
+  users: BoardUser[]
   onClose: () => void
-  onSave: (task: unknown) => void
+  onSave: (task: BoardTask) => void
   onDelete?: () => void
 }
 
@@ -102,20 +84,25 @@ export default function TaskModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">
             {mode === 'create' ? 'New Task' : 'Edit Task'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label={`Close ${mode === 'create' ? 'new task' : 'edit task'} modal`}
+          >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" aria-busy={loading}>
           {error && (
             <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               {error}
@@ -145,7 +132,7 @@ export default function TaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
@@ -203,7 +190,8 @@ export default function TaskModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                disabled={loading}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Cancel
               </button>
@@ -229,6 +217,7 @@ export default function TaskModal({
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(false)}
+                disabled={loading}
                 className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
               >
                 Cancel
