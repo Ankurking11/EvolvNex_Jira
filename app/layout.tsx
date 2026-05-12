@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import './globals.css'
 import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/prisma'
@@ -43,16 +44,18 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body style={{ fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <AppShell
-          projects={projects.map((project) => ({
-            id: project.id,
-            name: project.name,
-            boardId: project.board?.id ?? null,
-          }))}
-          users={users}
-        >
-          {children}
-        </AppShell>
+        <Suspense fallback={<main className="min-h-screen" />}>
+          <AppShell
+            projects={projects.map((project) => ({
+              id: project.id,
+              name: project.name,
+              boardId: project.board?.id ?? null,
+            }))}
+            users={users}
+          >
+            {children}
+          </AppShell>
+        </Suspense>
       </body>
     </html>
   )
