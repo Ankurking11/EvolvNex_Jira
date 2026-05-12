@@ -21,9 +21,9 @@ interface ColumnProps {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  TODO: 'bg-gray-200 text-gray-700',
-  IN_PROGRESS: 'bg-blue-100 text-blue-700',
-  DONE: 'bg-green-100 text-green-700',
+  TODO: 'bg-slate-100 text-slate-700 border-slate-200',
+  IN_PROGRESS: 'bg-blue-50 text-blue-700 border-blue-200',
+  DONE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 }
 
 function Column({
@@ -41,26 +41,30 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id })
 
   return (
-    <div className={`flex flex-col w-72 sm:w-80 rounded-xl ${color} border border-gray-200 ${isOver ? 'ring-2 ring-blue-400' : ''}`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+    <section
+      className={`flex h-full w-[300px] flex-col rounded-lg border border-gray-200 ${color} transition-all sm:w-[320px] ${
+        isOver ? 'ring-2 ring-blue-300 shadow-sm' : ''
+      }`}
+    >
+      <header className="sticky top-0 z-20 flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white/90 px-3 py-2 backdrop-blur">
         <div className="flex items-center gap-2">
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[id]}`}>
-            {tasks.length}
-          </span>
-          <h3 className="font-semibold text-gray-800 text-sm">{label}</h3>
+          <span className={`rounded border px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[id]}`}>{tasks.length}</span>
+          <h3 className="text-sm font-semibold text-gray-800">{label}</h3>
         </div>
+
         <button
           onClick={() => setShowModal(true)}
-          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-white rounded transition-colors"
+          className="flex h-7 w-7 items-center justify-center rounded text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
           title="Add task"
+          aria-label={`Add task to ${label}`}
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
         </button>
-      </div>
+      </header>
 
-      <div ref={setNodeRef} className="flex-1 p-3 space-y-2 overflow-y-auto min-h-[200px]">
+      <div ref={setNodeRef} className="flex-1 space-y-2 overflow-y-auto p-2.5">
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
             <TaskCard
@@ -72,9 +76,10 @@ function Column({
             />
           ))}
         </SortableContext>
+
         {tasks.length === 0 && (
-          <div className="flex items-center justify-center h-24 text-sm text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
-            Drop tasks here
+          <div className="grid h-24 place-items-center rounded-md border border-dashed border-gray-300 bg-white/70 text-center text-xs text-gray-500">
+            <span className="px-2">Drop tasks here or create a new one</span>
           </div>
         )}
       </div>
@@ -92,7 +97,7 @@ function Column({
           }}
         />
       )}
-    </div>
+    </section>
   )
 }
 

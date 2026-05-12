@@ -20,71 +20,60 @@ export default async function DashboardPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">E</span>
-            </div>
-            <h1 className="text-xl font-semibold text-gray-900">EvolvNex</h1>
-          </div>
-          <CreateProjectButton />
+    <div className="h-full overflow-y-auto px-3 py-3 sm:px-4 sm:py-4">
+      <section className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900 sm:text-xl">Dashboard</h1>
+          <p className="mt-0.5 text-sm text-gray-600">Operational overview for projects, tasks, and progress.</p>
         </div>
-      </header>
+        <CreateProjectButton />
+      </section>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-          <p className="text-gray-500 mt-1">Overview of your projects and tasks</p>
+      <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Projects</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{projects.length}</p>
         </div>
-
-        {/* Summary stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Projects</p>
-            <p className="text-3xl font-bold text-gray-900">{projects.length}</p>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">To Do</p>
-            <p className="text-3xl font-bold text-gray-500">{todoCount}</p>
-            <p className="text-xs text-gray-400 mt-1">{totalTasks > 0 ? Math.round((todoCount / totalTasks) * 100) : 0}% of tasks</p>
-          </div>
-          <div className="bg-white rounded-lg border border-blue-100 p-4">
-            <p className="text-xs font-medium text-blue-500 uppercase tracking-wide mb-1">In Progress</p>
-            <p className="text-3xl font-bold text-blue-600">{inProgressCount}</p>
-            <p className="text-xs text-gray-400 mt-1">{totalTasks > 0 ? Math.round((inProgressCount / totalTasks) * 100) : 0}% of tasks</p>
-          </div>
-          <div className="bg-white rounded-lg border border-green-100 p-4">
-            <p className="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">Done</p>
-            <p className="text-3xl font-bold text-green-600">{doneCount}</p>
-            <p className="text-xs text-gray-400 mt-1">{totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0}% of tasks</p>
-          </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">To Do</p>
+          <p className="mt-1 text-2xl font-bold text-gray-700">{todoCount}</p>
+          <p className="text-[11px] text-gray-500">{totalTasks > 0 ? Math.round((todoCount / totalTasks) * 100) : 0}%</p>
         </div>
+        <div className="rounded-lg border border-blue-200 bg-white p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-600">In Progress</p>
+          <p className="mt-1 text-2xl font-bold text-blue-700">{inProgressCount}</p>
+          <p className="text-[11px] text-gray-500">{totalTasks > 0 ? Math.round((inProgressCount / totalTasks) * 100) : 0}%</p>
+        </div>
+        <div className="rounded-lg border border-emerald-200 bg-white p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Done</p>
+          <p className="mt-1 text-2xl font-bold text-emerald-700">{doneCount}</p>
+          <p className="text-[11px] text-gray-500">{totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0}%</p>
+        </div>
+      </section>
 
-        <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">Projects</h3>
-          <p className="text-sm text-gray-500">{projects.length} {projects.length === 1 ? 'project' : 'projects'}</p>
+      <section className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-900">Projects</h2>
+          <p className="text-xs text-gray-500">
+            {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+          </p>
         </div>
 
         {projects.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
+          <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-center">
+            <div>
+              <h3 className="text-base font-semibold text-gray-800">No projects yet</h3>
+              <p className="mt-1 text-sm text-gray-500">Create your first project to start planning work.</p>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
-            <p className="text-gray-500">Create your first project to get started</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {projects.map((project) => (
               <ProjectCard key={project.id} project={project} />
             ))}
           </div>
         )}
-      </main>
+      </section>
     </div>
   )
 }
