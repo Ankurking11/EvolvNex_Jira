@@ -11,13 +11,17 @@ export async function GET(request: NextRequest) {
     const board = await prisma.board.findFirst({
       where: { projectId },
       include: {
-        members: {
+        project: {
           include: {
-            user: true,
-          },
-          orderBy: {
-            user: {
-              name: 'asc',
+            members: {
+              include: {
+                user: true,
+              },
+              orderBy: {
+                user: {
+                  name: 'asc',
+                },
+              },
             },
           },
         },
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       id: board.id,
-      members: board.members.map((member) => member.user),
+      members: board.project.members.map((member) => member.user),
       tasks: board.tasks.map((task) => ({
         id: task.id,
         title: task.title,
@@ -52,6 +56,7 @@ export async function GET(request: NextRequest) {
         assignee: task.assignee,
         commentCount: task._count.comments,
         boardId: task.boardId,
+        dueDate: task.dueDate,
         createdAt: task.createdAt,
         updatedAt: task.updatedAt,
       })),

@@ -53,6 +53,7 @@ model Task {
   boardId     String    @db.Uuid @map("board_id")
   board       Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
   comments    Comment[]
+  dueDate     DateTime? @map("due_date")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 

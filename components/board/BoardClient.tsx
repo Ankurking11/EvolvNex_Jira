@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   DndContext,
@@ -21,6 +20,7 @@ import { getSupabaseBrowserClient } from '@/lib/supabase'
 import Column from './Column'
 import TaskCard from '../task/TaskCard'
 import ProjectMembersModal from './ProjectMembersModal'
+import ProjectSettingsModal from './ProjectSettingsModal'
 
 const POLLING_INTERVAL_MS = 20000
 const TOUCH_ACTIVATION_DELAY_MS = 180
@@ -91,6 +91,7 @@ function parseBoardTasks(data: unknown): BoardTask[] | null {
       assignee: assignee ?? null,
       commentCount: candidate.commentCount,
       boardId: candidate.boardId,
+      dueDate: typeof candidate.dueDate === 'string' ? candidate.dueDate : null,
       createdAt: candidate.createdAt,
       updatedAt: candidate.updatedAt,
     })
@@ -138,6 +139,7 @@ function hasTaskListChanged(previous: BoardTask[], next: BoardTask[]) {
       previousTask.priority !== task.priority ||
       previousTask.assigneeId !== task.assigneeId ||
       previousTask.commentCount !== task.commentCount ||
+      String(previousTask.dueDate) !== String(task.dueDate) ||
       String(previousTask.updatedAt) !== String(task.updatedAt)
     ) {
       return true
@@ -175,6 +177,9 @@ export default function BoardClient({ board, users, projectId, projectName, proj
   const [showFilters, setShowFilters] = useState(false)
   const [showSort, setShowSort] = useState(false)
   const [showMembers, setShowMembers] = useState(false)
+  const [showProjectSettings, setShowProjectSettings] = useState(false)
+  const [currentProjectName, setCurrentProjectName] = useState(projectName ?? '')
+  const [currentProjectDescription, setCurrentProjectDescription] = useState(projectDescription ?? null)
   const latestRefreshRequest = useRef(0)
   const moveErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const boardTaskIdsRef = useRef<Set<string>>(new Set(board.tasks.map((task) => task.id)))
@@ -464,10 +469,20 @@ export default function BoardClient({ board, users, projectId, projectName, proj
       )}
 
       <div className="flex h-full flex-col overflow-hidden" aria-live="polite">
-        {(projectName || projectDescription) && (
-          <header className="border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
-            <h1 className="text-sm font-semibold text-gray-900">{projectName}</h1>
-            {projectDescription && <p className="line-clamp-1 text-xs text-gray-500">{projectDescription}</p>}
+        {(currentProjectName || currentProjectDescription) && (
+          <header className="flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
+            <div className="min-w-0">
+              <h1 className="text-sm font-semibold text-gray-900">{currentProjectName}</h1>
+              {currentProjectDescription && <p className="line-clamp-1 text-xs text-gray-500">{currentProjectDescription}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowProjectSettings(true)}
+              className="ml-2 flex-shrink-0 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+              aria-label="Project settings"
+            >
+              Edit project
+            </button>
           </header>
         )}
         <div className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 px-3 py-2 backdrop-blur sm:px-4">
@@ -493,12 +508,13 @@ export default function BoardClient({ board, users, projectId, projectName, proj
             >
               Members ({members.length})
             </button>
-            <Link
-              href="/dashboard?view=settings"
+            <button
+              type="button"
+              onClick={() => setShowProjectSettings(true)}
               className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
             >
               Settings
-            </Link>
+            </button>
 
             <div className="relative ml-auto w-full min-w-[180px] max-w-xs sm:w-auto sm:flex-1">
               <svg className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -622,6 +638,19 @@ export default function BoardClient({ board, users, projectId, projectName, proj
           members={members}
           onClose={() => setShowMembers(false)}
           onSave={setMembers}
+        />
+      )}
+
+      {showProjectSettings && (
+        <ProjectSettingsModal
+          projectId={projectId}
+          projectName={currentProjectName}
+          projectDescription={currentProjectDescription}
+          onClose={() => setShowProjectSettings(false)}
+          onUpdate={(name, description) => {
+            setCurrentProjectName(name)
+            setCurrentProjectDescription(description)
+          }}
         />
       )}
     </DndContext>

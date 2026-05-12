@@ -14,6 +14,7 @@ export type BoardTask = {
   assignee: BoardUser | null
   commentCount: number
   boardId: string
+  dueDate: string | Date | null
   createdAt: string | Date
   updatedAt: string | Date
 }

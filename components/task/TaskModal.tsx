@@ -46,6 +46,11 @@ export default function TaskModal({
   const [status, setStatus] = useState<TaskStatus>((task?.status as TaskStatus) ?? defaultStatus)
   const [priority, setPriority] = useState<TaskPriority>((task?.priority as TaskPriority) ?? 'MEDIUM')
   const [assigneeId, setAssigneeId] = useState(task?.assigneeId ?? '')
+  const [dueDate, setDueDate] = useState<string>(() => {
+    if (!task?.dueDate) return ''
+    const date = new Date(task.dueDate)
+    return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0]
+  })
   const [loading, setLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,7 +60,7 @@ export default function TaskModal({
   const updatedAt = useMemo(() => (task ? getReadableDate(task.updatedAt) : null), [task])
   const taskDisplayId = task?.id ? task.id.slice(0, 8).toUpperCase() : 'UNKNOWN'
   const userOptions =
-    task?.assignee && !users.some((user) => user.id === task.assignee.id)
+    task?.assignee && !users.some((user) => user.id === task.assignee!.id)
       ? [...users, task.assignee].sort((left, right) => left.name.localeCompare(right.name))
       : users
 
@@ -91,6 +96,7 @@ export default function TaskModal({
           priority,
           assigneeId: assigneeId || undefined,
           boardId,
+          dueDate: dueDate || null,
         })
         setFeedback('Task created')
         onSave(created)
@@ -101,6 +107,7 @@ export default function TaskModal({
           status,
           priority,
           assigneeId: assigneeId || null,
+          dueDate: dueDate || null,
         })
         setFeedback('Changes saved')
         onSave(updated)
@@ -263,7 +270,12 @@ export default function TaskModal({
 
               <div>
                 <label className={FIELD_LABEL_CLASS}>Due date</label>
-                <input type="date" className={INPUT_BASE_CLASS} />
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(event) => setDueDate(event.target.value)}
+                  className={INPUT_BASE_CLASS}
+                />
               </div>
 
               <div className="space-y-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">

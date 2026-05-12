@@ -16,6 +16,7 @@ function serializeTask(task: {
   assigneeId: string | null
   assignee: BoardUser | null
   boardId: string
+  dueDate: Date | null
   createdAt: Date
   updatedAt: Date
   _count?: { comments: number }
@@ -30,6 +31,7 @@ function serializeTask(task: {
     assignee: task.assignee,
     commentCount: task._count?.comments ?? 0,
     boardId: task.boardId,
+    dueDate: task.dueDate,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   }
@@ -68,13 +70,17 @@ export async function getBoardData(projectId: string) {
     const board = await prisma.board.findFirst({
       where: { projectId },
       include: {
-        members: {
+        project: {
           include: {
-            user: true,
-          },
-          orderBy: {
-            user: {
-              name: 'asc',
+            members: {
+              include: {
+                user: true,
+              },
+              orderBy: {
+                user: {
+                  name: 'asc',
+                },
+              },
             },
           },
         },
@@ -96,7 +102,7 @@ export async function getBoardData(projectId: string) {
     return {
       id: board.id,
       tasks: board.tasks.map(serializeTask),
-      members: board.members.map((member) => member.user),
+      members: board.project.members.map((member) => member.user),
     }
   } catch (error) {
     console.error('[getBoardData] Failed to fetch board for project', projectId, error)
@@ -299,10 +305,19 @@ export async function createTask(data: {
   priority: TaskPriority
   assigneeId?: string
   boardId: string
+  dueDate?: string | null
 }) {
   try {
     const task = await prisma.task.create({
-      data,
+      data: {
+        title: data.title,
+        description: data.description,
+        status: data.status,
+        priority: data.priority,
+        assigneeId: data.assigneeId,
+        boardId: data.boardId,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      },
       include: {
         assignee: true,
         board: {
@@ -334,12 +349,22 @@ export async function updateTask(
     status?: TaskStatus
     priority?: TaskPriority
     assigneeId?: string | null
+    dueDate?: string | null
   }
 ) {
   try {
     const task = await prisma.task.update({
       where: { id: taskId },
-      data,
+      data: {
+        title: data.title,
+        description: data.description,
+        status: data.status,
+        priority: data.priority,
+        assigneeId: data.assigneeId,
+        ...(Object.prototype.hasOwnProperty.call(data, 'dueDate')
+          ? { dueDate: data.dueDate ? new Date(data.dueDate) : null }
+          : {}),
+      },
       include: {
         assignee: true,
         board: {
@@ -418,6 +443,32 @@ export async function createProject(data: { name: string; description?: string }
     return project
   } catch (error) {
     console.error('[createProject] Failed to create project', { name: data.name }, error)
+    throw error
+  }
+}
+
+export async function updateProject(projectId: string, data: { name?: string; description?: string | null }) {
+  try {
+    const project = await prisma.project.update({
+      where: { id: projectId },
+      data,
+    })
+    revalidateProjectAndDashboard(projectId)
+    return project
+  } catch (error) {
+    console.error('[updateProject] Failed to update project', { projectId }, error)
+    throw error
+  }
+}
+
+export async function deleteProject(projectId: string) {
+  try {
+    await prisma.project.delete({
+      where: { id: projectId },
+    })
+    revalidatePath('/dashboard')
+  } catch (error) {
+    console.error('[deleteProject] Failed to delete project', { projectId }, error)
     throw error
   }
 }
