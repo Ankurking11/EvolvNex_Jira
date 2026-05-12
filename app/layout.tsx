@@ -44,7 +44,13 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body style={{ fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <Suspense fallback={<main className="min-h-screen" />}>
+        <Suspense
+          fallback={
+            <main className="min-h-screen" aria-live="polite" aria-busy="true">
+              <span className="sr-only">Loading application</span>
+            </main>
+          }
+        >
           <AppShell
             projects={projects.map((project) => ({
               id: project.id,
