@@ -21,19 +21,21 @@ import Column from './Column'
 import TaskCard from '../task/TaskCard'
 
 const POLLING_INTERVAL_MS = 20000
-const TOUCH_ACTIVATION_DELAY_MS = 150
+const TOUCH_ACTIVATION_DELAY_MS = 180
 const TOUCH_ACTIVATION_TOLERANCE_PX = 6
 
 interface BoardClientProps {
   board: BoardData
   users: BoardUser[]
   projectId: string
+  projectName?: string
+  projectDescription?: string | null
 }
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
-  { id: 'TODO', label: 'To Do', color: 'bg-gray-100' },
-  { id: 'IN_PROGRESS', label: 'In Progress', color: 'bg-blue-50' },
-  { id: 'DONE', label: 'Done', color: 'bg-green-50' },
+  { id: 'TODO', label: 'To Do', color: 'bg-slate-50' },
+  { id: 'IN_PROGRESS', label: 'In Progress', color: 'bg-blue-50/70' },
+  { id: 'DONE', label: 'Done', color: 'bg-emerald-50/70' },
 ]
 
 function isTaskStatus(value: unknown): value is TaskStatus {
@@ -125,7 +127,7 @@ function updateTasksIfChanged(previous: BoardTask[], next: BoardTask[]) {
   return hasTaskListChanged(previous, next) ? next : previous
 }
 
-export default function BoardClient({ board, users, projectId }: BoardClientProps) {
+export default function BoardClient({ board, users, projectId, projectName, projectDescription }: BoardClientProps) {
   const [tasks, setTasks] = useState<BoardTask[]>(board.tasks)
   const [activeTask, setActiveTask] = useState<BoardTask | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
@@ -226,7 +228,6 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        // Delay and tolerance prevent accidental drags while scrolling on touch devices.
         delay: TOUCH_ACTIVATION_DELAY_MS,
         tolerance: TOUCH_ACTIVATION_TOLERANCE_PX,
       },
@@ -250,47 +251,55 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
     [tasks]
   )
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const task = tasks.find((t) => t.id === event.active.id)
-    setActiveTask(task ?? null)
-  }, [tasks])
+  const totalTasks = tasks.length
 
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    setActiveTask(null)
-    const { active, over } = event
-    if (!over) return
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const task = tasks.find((t) => t.id === event.active.id)
+      setActiveTask(task ?? null)
+    },
+    [tasks]
+  )
 
-    const taskId = active.id as string
-    const overId = over.id as string
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      setActiveTask(null)
+      const { active, over } = event
+      if (!over) return
 
-    let newStatus: TaskStatus | null = null
-    if (COLUMNS.some((c) => c.id === overId)) {
-      newStatus = overId as TaskStatus
-    } else {
-      const overTask = tasks.find((t) => t.id === overId)
-      if (overTask) newStatus = overTask.status as TaskStatus
-    }
+      const taskId = active.id as string
+      const overId = over.id as string
 
-    if (!newStatus) return
-
-    const task = tasks.find((t) => t.id === taskId)
-    if (!task || task.status === newStatus) return
-
-    const resolvedStatus = newStatus
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: resolvedStatus } : t)))
-
-    try {
-      await moveTask(taskId, newStatus)
-    } catch (error) {
-      console.error('Failed to move task:', error)
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t)))
-      setMoveError('Failed to move task. Please try again.')
-      if (moveErrorTimer.current) {
-        clearTimeout(moveErrorTimer.current)
+      let newStatus: TaskStatus | null = null
+      if (COLUMNS.some((c) => c.id === overId)) {
+        newStatus = overId as TaskStatus
+      } else {
+        const overTask = tasks.find((t) => t.id === overId)
+        if (overTask) newStatus = overTask.status as TaskStatus
       }
-      moveErrorTimer.current = setTimeout(() => setMoveError(null), 3000)
-    }
-  }, [tasks])
+
+      if (!newStatus) return
+
+      const task = tasks.find((t) => t.id === taskId)
+      if (!task || task.status === newStatus) return
+
+      const resolvedStatus = newStatus
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: resolvedStatus } : t)))
+
+      try {
+        await moveTask(taskId, newStatus)
+      } catch (error) {
+        console.error('Failed to move task:', error)
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t)))
+        setMoveError('Failed to move task. Please try again.')
+        if (moveErrorTimer.current) {
+          clearTimeout(moveErrorTimer.current)
+        }
+        moveErrorTimer.current = setTimeout(() => setMoveError(null), 3000)
+      }
+    },
+    [tasks]
+  )
 
   const handleTaskUpdate = useCallback((updatedTask: BoardTask) => {
     setTasks((prev) => upsertTask(prev, updatedTask))
@@ -312,47 +321,85 @@ export default function BoardClient({ board, users, projectId }: BoardClientProp
       onDragEnd={handleDragEnd}
     >
       {moveError && (
-        <div className="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50">
-          {moveError}
-        </div>
+        <div className="fixed bottom-4 right-4 z-50 rounded-md bg-red-600 px-4 py-2 text-sm text-white shadow-lg">{moveError}</div>
       )}
       {syncError && (
-        <div className="fixed top-4 right-4 bg-amber-100 border border-amber-300 text-amber-800 px-4 py-2 rounded-lg shadow text-xs sm:text-sm z-50">
+        <div className="fixed right-4 top-[4.5rem] z-50 rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs text-amber-800 shadow sm:text-sm">
           {syncError}
         </div>
       )}
-      <div className="h-full overflow-x-auto">
-        <div className="flex gap-4 p-4 sm:p-6 h-full min-w-max">
-          {isRefreshing && (
-            <div className="fixed right-4 top-16 text-xs text-gray-500 bg-white/90 rounded px-2 py-1 border border-gray-200 z-40">
-              Syncing…
+
+      <div className="flex h-full flex-col overflow-hidden" aria-live="polite">
+        {(projectName || projectDescription) && (
+          <header className="border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
+            <h1 className="text-sm font-semibold text-gray-900">{projectName}</h1>
+            {projectDescription && <p className="line-clamp-1 text-xs text-gray-500">{projectDescription}</p>}
+          </header>
+        )}
+        <div className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 px-3 py-2 backdrop-blur sm:px-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <button className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+              Filters
+            </button>
+            <button className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+              Sort
+            </button>
+            <button className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+              Members ({users.length})
+            </button>
+            <button className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+              Board settings
+            </button>
+
+            <div className="relative ml-auto w-full min-w-[180px] max-w-xs sm:w-auto sm:flex-1">
+              <svg className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M12.9 14.32A8 8 0 1114.32 12.9l3.39 3.39a1 1 0 01-1.42 1.42l-3.39-3.39ZM14 8a6 6 0 11-12 0 6 6 0 0112 0Z" clipRule="evenodd" />
+              </svg>
+              <input
+                type="search"
+                placeholder="Search tasks"
+                className="w-full rounded-md border border-gray-300 bg-white py-1.5 pl-8 pr-2 text-xs text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
             </div>
-          )}
-          {COLUMNS.map((col) => (
-            <Column
-              key={col.id}
-              id={col.id}
-              label={col.label}
-              color={col.color}
-              tasks={tasksByStatus[col.id]}
-              users={users}
-              boardId={board.id}
-              onTaskUpdate={handleTaskUpdate}
-              onTaskDelete={handleTaskDelete}
-              onTaskCreate={handleTaskCreate}
-            />
-          ))}
+
+            <div className="text-xs text-gray-500">
+              {isRefreshing ? (
+                <span className="inline-flex items-center gap-1 text-blue-600">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+                  Syncing…
+                </span>
+              ) : (
+                `${totalTasks} tasks`
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="h-full overflow-x-auto">
+          <div className="flex min-w-max gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4">
+            {COLUMNS.map((col) => (
+              <Column
+                key={col.id}
+                id={col.id}
+                label={col.label}
+                color={col.color}
+                tasks={tasksByStatus[col.id]}
+                users={users}
+                boardId={board.id}
+                onTaskUpdate={handleTaskUpdate}
+                onTaskDelete={handleTaskDelete}
+                onTaskCreate={handleTaskCreate}
+              />
+            ))}
+          </div>
         </div>
       </div>
+
       <DragOverlay>
         {activeTask && (
-          <TaskCard
-            task={activeTask}
-            users={users}
-            onUpdate={handleTaskUpdate}
-            onDelete={handleTaskDelete}
-            isDragging
-          />
+          <div className="w-[300px] rotate-1 scale-[1.01] sm:w-[320px]">
+            <TaskCard task={activeTask} users={users} onUpdate={handleTaskUpdate} onDelete={handleTaskDelete} isDragging />
+          </div>
         )}
       </DragOverlay>
     </DndContext>
