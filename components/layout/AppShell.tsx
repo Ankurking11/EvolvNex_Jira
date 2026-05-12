@@ -10,11 +10,11 @@ interface AppShellProps {
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/dashboard', label: 'Projects' },
-  { href: '/dashboard', label: 'My Tasks' },
-  { href: '/dashboard', label: 'Activity' },
-  { href: '/dashboard', label: 'Reports' },
-  { href: '/dashboard', label: 'Settings' },
+  { href: '/dashboard?view=projects', label: 'Projects' },
+  { href: '/dashboard?view=my-tasks', label: 'My Tasks' },
+  { href: '/dashboard?view=activity', label: 'Activity' },
+  { href: '/dashboard?view=reports', label: 'Reports' },
+  { href: '/dashboard?view=settings', label: 'Settings' },
 ]
 
 function toTitleCase(value: string) {
@@ -60,7 +60,7 @@ export default function AppShell({ children }: AppShellProps) {
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-2">
           {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href || (item.label === 'Projects' && pathname.startsWith('/project'))
+            const isActive = item.label === 'Projects' ? pathname.startsWith('/project') : pathname === '/dashboard'
             return (
               <Link
                 key={`${item.label}-${item.href}`}

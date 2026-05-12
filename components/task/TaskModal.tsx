@@ -174,8 +174,8 @@ export default function TaskModal({
               <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50/70 p-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">Activity</h3>
                 <ol className="space-y-2 text-xs text-gray-600">
-                  <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Task opened for editing</li>
-                  <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Latest board updates sync automatically</li>
+                  <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Activity timeline will appear here soon.</li>
+                  <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Realtime board updates are enabled for this task.</li>
                 </ol>
               </div>
 

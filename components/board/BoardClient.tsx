@@ -324,7 +324,7 @@ export default function BoardClient({ board, users, projectId, projectName, proj
         <div className="fixed bottom-4 right-4 z-50 rounded-md bg-red-600 px-4 py-2 text-sm text-white shadow-lg">{moveError}</div>
       )}
       {syncError && (
-        <div className="fixed right-4 top-18 z-50 rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs text-amber-800 shadow sm:text-sm">
+        <div className="fixed right-4 top-[4.5rem] z-50 rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs text-amber-800 shadow sm:text-sm">
           {syncError}
         </div>
       )}

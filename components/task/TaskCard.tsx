@@ -33,7 +33,7 @@ function getInitials(name: string) {
 
 function getRelativeTime(dateValue: string | Date) {
   const date = new Date(dateValue)
-  const diffMs = date.getTime() - Date.now()
+  const diffMs = Date.now() - date.getTime()
   const diffMinutes = Math.round(diffMs / 60000)
   const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 
@@ -53,6 +53,7 @@ function getRelativeTime(dateValue: string | Date) {
 function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps) {
   const [showModal, setShowModal] = useState(false)
   const dragIntentRef = useRef(false)
+  const suppressClickUntilRef = useRef(0)
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging } = useSortable({
@@ -92,12 +93,13 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
         }}
         onPointerUp={() => {
           pointerStartRef.current = null
-          requestAnimationFrame(() => {
-            dragIntentRef.current = false
-          })
+          if (dragIntentRef.current) {
+            suppressClickUntilRef.current = Date.now() + 140
+          }
+          dragIntentRef.current = false
         }}
         onClick={() => {
-          if (dragIntentRef.current || isMoving || isDragPreview) return
+          if (Date.now() < suppressClickUntilRef.current || dragIntentRef.current || isMoving || isDragPreview) return
           setShowModal(true)
         }}
         role="button"
@@ -124,7 +126,7 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
               className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
               title="Task actions"
             >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path d="M3.5 10a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Z" />
               </svg>
             </button>
@@ -155,15 +157,15 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">{task.status.replace('_', ' ')}</span>
+            <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">{task.status.replaceAll('_', ' ')}</span>
             <span className="inline-flex items-center gap-1">
-              <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path d="M18 10c0 .552-.448 1-1 1H6.414l3.293 3.293a1 1 0 11-1.414 1.414l-5-5a.997.997 0 010-1.414l5-5a1 1 0 111.414 1.414L6.414 9H17c.552 0 1 .448 1 1Z" />
               </svg>
               0
             </span>
             <span className="inline-flex items-center gap-1">
-              <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path d="M4 5a3 3 0 013-3h6a3 3 0 013 3v10a3 3 0 01-3 3H7a3 3 0 01-3-3V5Zm3-1a1 1 0 00-1 1v10a1 1 0 001 1h6a1 1 0 001-1V5a1 1 0 00-1-1H7Z" />
               </svg>
               0
