@@ -6,7 +6,7 @@ import CreateProjectButton from '@/components/ui/CreateProjectButton'
 
 export default async function DashboardPage() {
   const projects = await getProjects()
-
+  console.log('DATABASE_URL EXISTS:', !!process.env.DATABASE_URL)
   const allTasks = projects.flatMap((p) => p.board?.tasks ?? [])
   const totalTasks = allTasks.length
   const { todoCount, inProgressCount, doneCount } = allTasks.reduce(
