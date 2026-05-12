@@ -417,7 +417,11 @@ export default function BoardClient({ board, users, projectId, projectName, proj
       const task = tasks.find((currentTask) => currentTask.id === taskId)
       if (!task || task.status === newStatus) return
 
-      setTasks((previous) => previous.map((currentTask) => (currentTask.id === taskId ? { ...currentTask, status: newStatus! } : currentTask)))
+      setTasks((previous) =>
+        previous.map((currentTask) =>
+          currentTask.id === taskId ? { ...currentTask, status: newStatus } : currentTask
+        )
+      )
 
       try {
         await moveTask(taskId, newStatus)
