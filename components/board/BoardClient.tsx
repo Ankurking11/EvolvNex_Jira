@@ -329,7 +329,7 @@ export default function BoardClient({ board, users, projectId, projectName, proj
         </div>
       )}
 
-      <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex h-full flex-col overflow-hidden" aria-live="polite">
         {(projectName || projectDescription) && (
           <div className="border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
             <p className="text-sm font-semibold text-gray-900">{projectName}</p>
@@ -352,7 +352,7 @@ export default function BoardClient({ board, users, projectId, projectName, proj
             </button>
 
             <div className="relative ml-auto w-full min-w-[180px] max-w-xs sm:w-auto sm:flex-1">
-              <svg className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <svg className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fillRule="evenodd" d="M12.9 14.32A8 8 0 1114.32 12.9l3.39 3.39a1 1 0 01-1.42 1.42l-3.39-3.39ZM14 8a6 6 0 11-12 0 6 6 0 0112 0Z" clipRule="evenodd" />
               </svg>
               <input

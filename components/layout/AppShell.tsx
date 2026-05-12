@@ -60,7 +60,9 @@ export default function AppShell({ children }: AppShellProps) {
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-2">
           {NAV_ITEMS.map((item) => {
-            const isActive = item.label === 'Projects' ? pathname.startsWith('/project') : pathname === '/dashboard'
+            const isActive =
+              (item.label === 'Dashboard' && pathname === '/dashboard') ||
+              (item.label === 'Projects' && pathname.startsWith('/project'))
             return (
               <Link
                 key={`${item.label}-${item.href}`}
@@ -107,7 +109,7 @@ export default function AppShell({ children }: AppShellProps) {
             </div>
 
             <div className="relative hidden min-w-[220px] flex-1 max-w-sm md:block">
-              <svg className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <svg className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fillRule="evenodd" d="M12.9 14.32A8 8 0 1114.32 12.9l3.39 3.39a1 1 0 01-1.42 1.42l-3.39-3.39ZM14 8a6 6 0 11-12 0 6 6 0 0112 0Z" clipRule="evenodd" />
               </svg>
               <input

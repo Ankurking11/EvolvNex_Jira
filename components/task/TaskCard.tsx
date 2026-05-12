@@ -21,6 +21,11 @@ const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
   MEDIUM: { label: 'Medium', className: 'bg-amber-50 text-amber-700 border-amber-200' },
   LOW: { label: 'Low', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 }
+const STATUS_LABELS: Record<string, string> = {
+  TODO: 'To Do',
+  IN_PROGRESS: 'In Progress',
+  DONE: 'Done',
+}
 
 function getInitials(name: string) {
   return name
@@ -33,21 +38,21 @@ function getInitials(name: string) {
 
 function getRelativeTime(dateValue: string | Date) {
   const date = new Date(dateValue)
-  const diffMs = Date.now() - date.getTime()
-  const diffMinutes = Math.round(diffMs / 60000)
+  const elapsedMs = Date.now() - date.getTime()
+  const elapsedMinutes = Math.round(elapsedMs / 60000)
   const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 
-  if (Math.abs(diffMinutes) < 60) {
-    return formatter.format(diffMinutes, 'minute')
+  if (Math.abs(elapsedMinutes) < 60) {
+    return formatter.format(-elapsedMinutes, 'minute')
   }
 
-  const diffHours = Math.round(diffMinutes / 60)
-  if (Math.abs(diffHours) < 24) {
-    return formatter.format(diffHours, 'hour')
+  const elapsedHours = Math.round(elapsedMinutes / 60)
+  if (Math.abs(elapsedHours) < 24) {
+    return formatter.format(-elapsedHours, 'hour')
   }
 
-  const diffDays = Math.round(diffHours / 24)
-  return formatter.format(diffDays, 'day')
+  const elapsedDays = Math.round(elapsedHours / 24)
+  return formatter.format(-elapsedDays, 'day')
 }
 
 function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps) {
@@ -157,14 +162,14 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">{task.status.replaceAll('_', ' ')}</span>
-            <span className="inline-flex items-center gap-1">
+            <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">{STATUS_LABELS[task.status] ?? task.status}</span>
+            <span className="inline-flex items-center gap-1" aria-label="Comments count">
               <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path d="M18 10c0 .552-.448 1-1 1H6.414l3.293 3.293a1 1 0 11-1.414 1.414l-5-5a.997.997 0 010-1.414l5-5a1 1 0 111.414 1.414L6.414 9H17c.552 0 1 .448 1 1Z" />
               </svg>
               0
             </span>
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex items-center gap-1" aria-label="Attachments count">
               <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path d="M4 5a3 3 0 013-3h6a3 3 0 013 3v10a3 3 0 01-3 3H7a3 3 0 01-3-3V5Zm3-1a1 1 0 00-1 1v10a1 1 0 001 1h6a1 1 0 001-1V5a1 1 0 00-1-1H7Z" />
               </svg>
