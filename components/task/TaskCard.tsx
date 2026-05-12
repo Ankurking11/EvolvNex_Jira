@@ -15,6 +15,7 @@ interface TaskCardProps {
 }
 
 const OPEN_GESTURE_TOLERANCE_PX = 6
+const CLICK_SUPPRESS_DURATION_MS = 140
 
 const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
   HIGH: { label: 'High', className: 'bg-red-50 text-red-700 border-red-200' },
@@ -63,7 +64,7 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging } = useSortable({
     id: task.id,
-    disabled: isDragging,
+    disabled: Boolean(isDragging),
   })
 
   const style = {
@@ -99,7 +100,7 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
         onPointerUp={() => {
           pointerStartRef.current = null
           if (dragIntentRef.current) {
-            suppressClickUntilRef.current = Date.now() + 140
+            suppressClickUntilRef.current = Date.now() + CLICK_SUPPRESS_DURATION_MS
           }
           dragIntentRef.current = false
         }}

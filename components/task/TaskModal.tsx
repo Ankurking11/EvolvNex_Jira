@@ -52,6 +52,7 @@ export default function TaskModal({
 
   const createdAt = useMemo(() => (task ? getReadableDate(task.createdAt) : null), [task])
   const updatedAt = useMemo(() => (task ? getReadableDate(task.updatedAt) : null), [task])
+  const taskDisplayId = task?.id ? task.id.slice(0, 8).toUpperCase() : 'UNKNOWN'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -115,7 +116,7 @@ export default function TaskModal({
           <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-5">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                {mode === 'create' ? 'Create task' : `Task #${task?.id.slice(0, 8).toUpperCase()}`}
+                {mode === 'create' ? 'Create task' : `Task #${taskDisplayId}`}
               </p>
               <h2 className="truncate text-base font-semibold text-gray-900 sm:text-lg">
                 {mode === 'create' ? 'New task details' : 'Task details'}
@@ -173,10 +174,10 @@ export default function TaskModal({
 
               <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50/70 p-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">Activity (preview)</h3>
-                <ol className="space-y-2 text-xs text-gray-600">
+                <ul className="space-y-2 text-xs text-gray-600">
                   <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Activity timeline will appear here soon.</li>
                   <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Realtime board updates are enabled for this task.</li>
-                </ol>
+                </ul>
               </div>
 
               <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50/70 p-3">

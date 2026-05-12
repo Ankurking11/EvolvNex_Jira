@@ -331,10 +331,10 @@ export default function BoardClient({ board, users, projectId, projectName, proj
 
       <div className="flex h-full flex-col overflow-hidden" aria-live="polite">
         {(projectName || projectDescription) && (
-          <div className="border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
-            <p className="text-sm font-semibold text-gray-900">{projectName}</p>
+          <header className="border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
+            <h1 className="text-sm font-semibold text-gray-900">{projectName}</h1>
             {projectDescription && <p className="line-clamp-1 text-xs text-gray-500">{projectDescription}</p>}
-          </div>
+          </header>
         )}
         <div className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 px-3 py-2 backdrop-blur sm:px-4">
           <div className="flex flex-wrap items-center gap-2">
