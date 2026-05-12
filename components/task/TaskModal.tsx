@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { TaskStatus, TaskPriority, createTask, updateTask, deleteTask } from '@/lib/actions'
 import { BoardTask, BoardUser } from '@/lib/board-types'
+import TaskComments from './TaskComments'
 
 interface TaskModalProps {
   mode: 'create' | 'edit'
@@ -53,9 +54,29 @@ export default function TaskModal({
   const createdAt = useMemo(() => (task ? getReadableDate(task.createdAt) : null), [task])
   const updatedAt = useMemo(() => (task ? getReadableDate(task.updatedAt) : null), [task])
   const taskDisplayId = task?.id ? task.id.slice(0, 8).toUpperCase() : 'UNKNOWN'
+  const userOptions =
+    task?.assignee && !users.some((user) => user.id === task.assignee.id)
+      ? [...users, task.assignee].sort((left, right) => left.name.localeCompare(right.name))
+      : users
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || loading) return
+
+      if (confirmDelete) {
+        setConfirmDelete(false)
+        return
+      }
+
+      onClose()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [confirmDelete, loading, onClose])
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
     if (!title.trim()) return
     setLoading(true)
     setError(null)
@@ -84,8 +105,8 @@ export default function TaskModal({
         setFeedback('Changes saved')
         onSave(updated)
       }
-    } catch (err) {
-      console.error('[TaskModal] Failed to save task', err)
+    } catch (saveError) {
+      console.error('[TaskModal] Failed to save task', saveError)
       setError(mode === 'create' ? 'Failed to create task. Please try again.' : 'Failed to save changes. Please try again.')
     } finally {
       setLoading(false)
@@ -101,8 +122,8 @@ export default function TaskModal({
     try {
       await deleteTask(task.id)
       onDelete?.()
-    } catch (err) {
-      console.error('[TaskModal] Failed to delete task', err)
+    } catch (deleteError) {
+      console.error('[TaskModal] Failed to delete task', deleteError)
       setError('Failed to delete task. Please try again.')
     } finally {
       setLoading(false)
@@ -153,7 +174,7 @@ export default function TaskModal({
                 <input
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(event) => setTitle(event.target.value)}
                   placeholder="Summarize the task"
                   className={INPUT_BASE_CLASS}
                   required
@@ -165,7 +186,7 @@ export default function TaskModal({
                 <label className={FIELD_LABEL_CLASS}>Description</label>
                 <textarea
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(event) => setDescription(event.target.value)}
                   placeholder="Add details, acceptance criteria, and context"
                   rows={6}
                   className={`${INPUT_BASE_CLASS} resize-y`}
@@ -175,14 +196,18 @@ export default function TaskModal({
               <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50/70 p-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">Activity (preview)</h3>
                 <ul className="space-y-2 text-xs text-gray-600">
-                  <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Activity timeline will appear here soon.</li>
-                  <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Realtime board updates are enabled for this task.</li>
+                  <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Recent updates continue to sync with the board in realtime.</li>
+                  <li className="rounded border border-gray-200 bg-white px-2.5 py-2">Use comments below to capture decisions and delivery context.</li>
                 </ul>
               </div>
 
               <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50/70 p-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">Comments</h3>
-                <p className="text-xs text-gray-500">Comment threads are coming soon.</p>
+                {mode === 'edit' && task ? (
+                  <TaskComments taskId={task.id} users={userOptions} defaultAuthorId={task.assigneeId} />
+                ) : (
+                  <p className="text-xs text-gray-500">Create the task first, then start a comment thread.</p>
+                )}
               </div>
 
               <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50/70 p-3">
@@ -196,11 +221,7 @@ export default function TaskModal({
 
               <div>
                 <label className={FIELD_LABEL_CLASS}>Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                  className={INPUT_BASE_CLASS}
-                >
+                <select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus)} className={INPUT_BASE_CLASS}>
                   <option value="TODO">To Do</option>
                   <option value="IN_PROGRESS">In Progress</option>
                   <option value="DONE">Done</option>
@@ -209,11 +230,7 @@ export default function TaskModal({
 
               <div>
                 <label className={FIELD_LABEL_CLASS}>Priority</label>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                  className={INPUT_BASE_CLASS}
-                >
+                <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)} className={INPUT_BASE_CLASS}>
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
                   <option value="HIGH">High</option>
@@ -222,9 +239,9 @@ export default function TaskModal({
 
               <div>
                 <label className={FIELD_LABEL_CLASS}>Assignee</label>
-                <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={INPUT_BASE_CLASS}>
+                <select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} className={INPUT_BASE_CLASS}>
                   <option value="">Unassigned</option>
-                  {users.map((user) => (
+                  {userOptions.map((user) => (
                     <option key={user.id} value={user.id}>
                       {user.name}
                     </option>
@@ -255,6 +272,9 @@ export default function TaskModal({
                 </p>
                 <p>
                   <span className="font-semibold text-gray-700">Updated:</span> {updatedAt ?? '—'}
+                </p>
+                <p>
+                  <span className="font-semibold text-gray-700">Comments:</span> {task?.commentCount ?? 0}
                 </p>
                 <p>
                   <span className="font-semibold text-gray-700">Board ID:</span> {task?.boardId ?? boardId ?? '—'}

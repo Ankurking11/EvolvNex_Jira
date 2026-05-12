@@ -166,9 +166,9 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
             <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">{STATUS_LABELS[task.status] ?? task.status}</span>
             <span className="inline-flex items-center gap-1" aria-label="Comments count">
               <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path d="M18 10c0 .552-.448 1-1 1H6.414l3.293 3.293a1 1 0 11-1.414 1.414l-5-5a.997.997 0 010-1.414l5-5a1 1 0 111.414 1.414L6.414 9H17c.552 0 1 .448 1 1Z" />
+                <path d="M4 4h12a2 2 0 012 2v7a2 2 0 01-2 2H9.414L6 18.414A1 1 0 014.293 17.7L4.586 15H4a2 2 0 01-2-2V6a2 2 0 012-2Z" />
               </svg>
-              0
+              {task.commentCount}
             </span>
             <span className="inline-flex items-center gap-1" aria-label="Attachments count">
               <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
