@@ -8,23 +8,26 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String
-  email     String   @unique
-  role      String   @default("MEMBER")
-  tasks     Task[]
-  createdAt DateTime @default(now()) @map("created_at")
+  id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String
+  email              String          @unique
+  role               String          @default("MEMBER")
+  tasks              Task[]
+  comments           Comment[]
+  projectMemberships ProjectMember[]
+  createdAt          DateTime        @default(now()) @map("created_at")
 
   @@map("users")
 }
 
 model Project {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String
   description String?
   board       Board?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  members     ProjectMember[]
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
 
   @@map("projects")
 }
@@ -49,8 +52,36 @@ model Task {
   assignee    User?     @relation(fields: [assigneeId], references: [id])
   boardId     String    @db.Uuid @map("board_id")
   board       Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  dueDate     DateTime? @map("due_date")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@map("tasks")
+}
+
+model ProjectMember {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId String   @db.Uuid @map("project_id")
+  userId    String   @db.Uuid @map("user_id")
+  role      String   @default("MEMBER")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model Comment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content   String
+  taskId    String   @db.Uuid @map("task_id")
+  authorId  String   @db.Uuid @map("author_id")
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("comments")
 }

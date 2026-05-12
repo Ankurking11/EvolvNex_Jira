@@ -1,11 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { ReactNode, useMemo, useState } from 'react'
+import { BoardUser } from '@/lib/board-types'
+import GlobalCreateButton from '@/components/ui/GlobalCreateButton'
 
 interface AppShellProps {
   children: ReactNode
+  projects: Array<{
+    id: string
+    name: string
+    boardId: string | null
+  }>
+  users: BoardUser[]
 }
 
 const NAV_ITEMS = [
@@ -23,16 +31,20 @@ function toTitleCase(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-export default function AppShell({ children }: AppShellProps) {
+export default function AppShell({ children, projects, users }: AppShellProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const currentView = searchParams.get('view') ?? 'dashboard'
 
   const breadcrumbs = useMemo(() => {
     const segments = pathname.split('/').filter(Boolean)
     if (segments.length === 0) return ['Home']
-    return ['Home', ...segments.map(toTitleCase)]
-  }, [pathname])
+
+    const extraView = pathname === '/dashboard' && currentView !== 'dashboard' ? [toTitleCase(currentView)] : []
+    return ['Home', ...segments.map(toTitleCase), ...extraView]
+  }, [currentView, pathname])
 
   return (
     <div className="flex h-screen bg-[#f5f7fb] text-gray-900">
@@ -61,8 +73,13 @@ export default function AppShell({ children }: AppShellProps) {
         <nav className="flex-1 space-y-1 overflow-y-auto p-2">
           {NAV_ITEMS.map((item) => {
             const isActive =
-              (item.label === 'Dashboard' && pathname === '/dashboard') ||
-              (item.label === 'Projects' && pathname.startsWith('/project'))
+              (item.label === 'Dashboard' && pathname === '/dashboard' && currentView === 'dashboard') ||
+              (item.label === 'Projects' && (pathname.startsWith('/project') || currentView === 'projects')) ||
+              (item.label === 'My Tasks' && currentView === 'my-tasks') ||
+              (item.label === 'Activity' && currentView === 'activity') ||
+              (item.label === 'Reports' && currentView === 'reports') ||
+              (item.label === 'Settings' && currentView === 'settings')
+
             return (
               <Link
                 key={item.href}
@@ -119,9 +136,7 @@ export default function AppShell({ children }: AppShellProps) {
               />
             </div>
 
-            <button className="rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700">
-              + Create
-            </button>
+            <GlobalCreateButton projects={projects} users={users} />
             <button className="rounded p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Notifications">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />

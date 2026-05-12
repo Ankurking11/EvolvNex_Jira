@@ -19,10 +19,14 @@ import { BoardData, BoardTask, BoardUser } from '@/lib/board-types'
 import { getSupabaseBrowserClient } from '@/lib/supabase'
 import Column from './Column'
 import TaskCard from '../task/TaskCard'
+import ProjectMembersModal from './ProjectMembersModal'
+import ProjectSettingsModal from './ProjectSettingsModal'
 
 const POLLING_INTERVAL_MS = 20000
 const TOUCH_ACTIVATION_DELAY_MS = 180
 const TOUCH_ACTIVATION_TOLERANCE_PX = 6
+
+type SortOption = 'updated-desc' | 'updated-asc' | 'priority-desc' | 'priority-asc' | 'title-asc'
 
 interface BoardClientProps {
   board: BoardData
@@ -58,6 +62,7 @@ function parseBoardTasks(data: unknown): BoardTask[] | null {
       !isTaskStatus(candidate.status) ||
       typeof candidate.priority !== 'string' ||
       typeof candidate.boardId !== 'string' ||
+      typeof candidate.commentCount !== 'number' ||
       typeof candidate.createdAt !== 'string' ||
       typeof candidate.updatedAt !== 'string'
     ) {
@@ -84,13 +89,39 @@ function parseBoardTasks(data: unknown): BoardTask[] | null {
       priority: candidate.priority,
       assigneeId: candidate.assigneeId ?? null,
       assignee: assignee ?? null,
+      commentCount: candidate.commentCount,
       boardId: candidate.boardId,
+      dueDate: typeof candidate.dueDate === 'string' ? candidate.dueDate : null,
       createdAt: candidate.createdAt,
       updatedAt: candidate.updatedAt,
     })
   }
 
   return parsedTasks
+}
+
+function parseBoardMembers(data: unknown): BoardUser[] | null {
+  if (!data || typeof data !== 'object' || !('members' in data)) return null
+
+  const members = (data as { members?: unknown }).members
+  if (!Array.isArray(members)) return null
+
+  const parsedMembers: BoardUser[] = []
+  for (const member of members) {
+    if (
+      !member ||
+      typeof member !== 'object' ||
+      typeof member.id !== 'string' ||
+      typeof member.name !== 'string' ||
+      typeof member.email !== 'string'
+    ) {
+      return null
+    }
+
+    parsedMembers.push(member)
+  }
+
+  return parsedMembers
 }
 
 function hasTaskListChanged(previous: BoardTask[], next: BoardTask[]) {
@@ -102,9 +133,13 @@ function hasTaskListChanged(previous: BoardTask[], next: BoardTask[]) {
     const previousTask = previousMap.get(task.id)
     if (
       !previousTask ||
+      previousTask.title !== task.title ||
+      previousTask.description !== task.description ||
       previousTask.status !== task.status ||
       previousTask.priority !== task.priority ||
       previousTask.assigneeId !== task.assigneeId ||
+      previousTask.commentCount !== task.commentCount ||
+      String(previousTask.dueDate) !== String(task.dueDate) ||
       String(previousTask.updatedAt) !== String(task.updatedAt)
     ) {
       return true
@@ -129,14 +164,30 @@ function updateTasksIfChanged(previous: BoardTask[], next: BoardTask[]) {
 
 export default function BoardClient({ board, users, projectId, projectName, projectDescription }: BoardClientProps) {
   const [tasks, setTasks] = useState<BoardTask[]>(board.tasks)
+  const [members, setMembers] = useState<BoardUser[]>(board.members)
   const [activeTask, setActiveTask] = useState<BoardTask | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [isRealtimeHealthy, setIsRealtimeHealthy] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [assigneeFilter, setAssigneeFilter] = useState('ALL')
+  const [priorityFilter, setPriorityFilter] = useState('ALL')
+  const [sortOption, setSortOption] = useState<SortOption>('updated-desc')
+  const [showFilters, setShowFilters] = useState(false)
+  const [showSort, setShowSort] = useState(false)
+  const [showMembers, setShowMembers] = useState(false)
+  const [showProjectSettings, setShowProjectSettings] = useState(false)
+  const [currentProjectName, setCurrentProjectName] = useState(projectName ?? '')
+  const [currentProjectDescription, setCurrentProjectDescription] = useState(projectDescription ?? null)
   const latestRefreshRequest = useRef(0)
   const moveErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const boardTaskIdsRef = useRef<Set<string>>(new Set(board.tasks.map((task) => task.id)))
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
+
+  useEffect(() => {
+    boardTaskIdsRef.current = new Set(tasks.map((task) => task.id))
+  }, [tasks])
 
   const refreshBoard = useCallback(async () => {
     const requestId = ++latestRefreshRequest.current
@@ -150,10 +201,14 @@ export default function BoardClient({ board, users, projectId, projectName, proj
 
       const data: unknown = await res.json()
       const parsedTasks = parseBoardTasks(data)
+      const parsedMembers = parseBoardMembers(data)
 
       if (requestId !== latestRefreshRequest.current || !parsedTasks) return
 
       setTasks((previous) => updateTasksIfChanged(previous, parsedTasks))
+      if (parsedMembers) {
+        setMembers(parsedMembers)
+      }
       setSyncError(null)
     } catch (error) {
       console.warn('Board polling error:', error)
@@ -213,6 +268,36 @@ export default function BoardClient({ board, users, projectId, projectName, proj
     }
   }, [board.id, refreshBoard, supabase])
 
+  useEffect(() => {
+    if (!supabase) return
+
+    const channel = supabase
+      .channel(`board-comments:${board.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, (payload) => {
+        const newRecord =
+          payload.new && typeof payload.new === 'object'
+            ? (payload.new as { task_id?: unknown })
+            : null
+        const oldRecord =
+          payload.old && typeof payload.old === 'object'
+            ? (payload.old as { task_id?: unknown })
+            : null
+
+        const taskId =
+          (typeof newRecord?.task_id === 'string' ? newRecord.task_id : null) ??
+          (typeof oldRecord?.task_id === 'string' ? oldRecord.task_id : null)
+
+        if (taskId && boardTaskIdsRef.current.has(taskId)) {
+          void refreshBoard()
+        }
+      })
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [board.id, refreshBoard, supabase])
+
   useEffect(
     () => () => {
       if (moveErrorTimer.current) {
@@ -237,21 +322,70 @@ export default function BoardClient({ board, users, projectId, projectName, proj
     })
   )
 
+  const assignableUsers = useMemo(() => {
+    const baseUsers = members.length > 0 ? members : users
+    const mergedUsers = new Map(baseUsers.map((user) => [user.id, user]))
+
+    for (const task of tasks) {
+      if (task.assignee) {
+        mergedUsers.set(task.assignee.id, task.assignee)
+      }
+    }
+
+    return Array.from(mergedUsers.values()).sort((left, right) => left.name.localeCompare(right.name))
+  }, [members, tasks, users])
+
   const tasksByStatus = useMemo(
     () =>
-      tasks.reduce<Record<TaskStatus, BoardTask[]>>(
-        (grouped, task) => {
-          if (isTaskStatus(task.status)) {
-            grouped[task.status].push(task)
+      [...tasks]
+        .filter((task) => {
+          const query = searchQuery.trim().toLowerCase()
+          const matchesSearch =
+            query.length === 0 ||
+            task.title.toLowerCase().includes(query) ||
+            task.description?.toLowerCase().includes(query)
+
+          const matchesAssignee = assigneeFilter === 'ALL' || task.assigneeId === assigneeFilter
+          const matchesPriority = priorityFilter === 'ALL' || task.priority === priorityFilter
+
+          return matchesSearch && matchesAssignee && matchesPriority
+        })
+        .sort((left, right) => {
+          if (sortOption === 'updated-asc') {
+            return new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime()
           }
-          return grouped
-        },
-        { TODO: [], IN_PROGRESS: [], DONE: [] }
-      ),
-    [tasks]
+
+          if (sortOption === 'updated-desc') {
+            return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+          }
+
+          if (sortOption === 'priority-desc') {
+            const order = { HIGH: 0, MEDIUM: 1, LOW: 2 }
+            return (order[left.priority as keyof typeof order] ?? 99) - (order[right.priority as keyof typeof order] ?? 99)
+          }
+
+          if (sortOption === 'priority-asc') {
+            const order = { LOW: 0, MEDIUM: 1, HIGH: 2 }
+            return (order[left.priority as keyof typeof order] ?? 99) - (order[right.priority as keyof typeof order] ?? 99)
+          }
+
+          return left.title.localeCompare(right.title)
+        })
+        .reduce<Record<TaskStatus, BoardTask[]>>(
+          (grouped, task) => {
+            if (isTaskStatus(task.status)) {
+              grouped[task.status].push(task)
+            }
+            return grouped
+          },
+          { TODO: [], IN_PROGRESS: [], DONE: [] }
+        ),
+    [assigneeFilter, priorityFilter, searchQuery, sortOption, tasks]
   )
 
   const totalTasks = tasks.length
+  const visibleTaskCount = tasksByStatus.TODO.length + tasksByStatus.IN_PROGRESS.length + tasksByStatus.DONE.length
+  const activeFilterCount = Number(searchQuery.trim().length > 0) + Number(assigneeFilter !== 'ALL') + Number(priorityFilter !== 'ALL')
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
@@ -271,26 +405,29 @@ export default function BoardClient({ board, users, projectId, projectName, proj
       const overId = over.id as string
 
       let newStatus: TaskStatus | null = null
-      if (COLUMNS.some((c) => c.id === overId)) {
+      if (COLUMNS.some((column) => column.id === overId)) {
         newStatus = overId as TaskStatus
       } else {
-        const overTask = tasks.find((t) => t.id === overId)
+        const overTask = tasks.find((task) => task.id === overId)
         if (overTask) newStatus = overTask.status as TaskStatus
       }
 
       if (!newStatus) return
 
-      const task = tasks.find((t) => t.id === taskId)
+      const task = tasks.find((currentTask) => currentTask.id === taskId)
       if (!task || task.status === newStatus) return
 
-      const resolvedStatus = newStatus
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: resolvedStatus } : t)))
+      setTasks((previous) =>
+        previous.map((currentTask) =>
+          currentTask.id === taskId ? { ...currentTask, status: newStatus } : currentTask
+        )
+      )
 
       try {
         await moveTask(taskId, newStatus)
       } catch (error) {
         console.error('Failed to move task:', error)
-        setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t)))
+        setTasks((previous) => previous.map((currentTask) => (currentTask.id === taskId ? { ...currentTask, status: task.status } : currentTask)))
         setMoveError('Failed to move task. Please try again.')
         if (moveErrorTimer.current) {
           clearTimeout(moveErrorTimer.current)
@@ -302,15 +439,21 @@ export default function BoardClient({ board, users, projectId, projectName, proj
   )
 
   const handleTaskUpdate = useCallback((updatedTask: BoardTask) => {
-    setTasks((prev) => upsertTask(prev, updatedTask))
+    setTasks((previous) => upsertTask(previous, updatedTask))
   }, [])
 
   const handleTaskDelete = useCallback((taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+    setTasks((previous) => previous.filter((task) => task.id !== taskId))
   }, [])
 
   const handleTaskCreate = useCallback((newTask: BoardTask) => {
-    setTasks((prev) => upsertTask(prev, newTask))
+    setTasks((previous) => upsertTask(previous, newTask))
+  }, [])
+
+  const clearFilters = useCallback(() => {
+    setSearchQuery('')
+    setAssigneeFilter('ALL')
+    setPriorityFilter('ALL')
   }, [])
 
   return (
@@ -330,25 +473,51 @@ export default function BoardClient({ board, users, projectId, projectName, proj
       )}
 
       <div className="flex h-full flex-col overflow-hidden" aria-live="polite">
-        {(projectName || projectDescription) && (
-          <header className="border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
-            <h1 className="text-sm font-semibold text-gray-900">{projectName}</h1>
-            {projectDescription && <p className="line-clamp-1 text-xs text-gray-500">{projectDescription}</p>}
+        {(currentProjectName || currentProjectDescription) && (
+          <header className="flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
+            <div className="min-w-0">
+              <h1 className="text-sm font-semibold text-gray-900">{currentProjectName}</h1>
+              {currentProjectDescription && <p className="line-clamp-1 text-xs text-gray-500">{currentProjectDescription}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowProjectSettings(true)}
+              className="ml-2 flex-shrink-0 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+              aria-label="Project settings"
+            >
+              Edit project
+            </button>
           </header>
         )}
         <div className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 px-3 py-2 backdrop-blur sm:px-4">
           <div className="flex flex-wrap items-center gap-2">
-            <button className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
-              Filters
+            <button
+              type="button"
+              onClick={() => setShowFilters((value) => !value)}
+              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
             </button>
-            <button className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+            <button
+              type="button"
+              onClick={() => setShowSort((value) => !value)}
+              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+            >
               Sort
             </button>
-            <button className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
-              Members ({users.length})
+            <button
+              type="button"
+              onClick={() => setShowMembers(true)}
+              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Members ({members.length})
             </button>
-            <button className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
-              Board settings
+            <button
+              type="button"
+              onClick={() => setShowProjectSettings(true)}
+              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Settings
             </button>
 
             <div className="relative ml-auto w-full min-w-[180px] max-w-xs sm:w-auto sm:flex-1">
@@ -357,6 +526,8 @@ export default function BoardClient({ board, users, projectId, projectName, proj
               </svg>
               <input
                 type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search tasks"
                 className="w-full rounded-md border border-gray-300 bg-white py-1.5 pl-8 pr-2 text-xs text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
@@ -369,22 +540,83 @@ export default function BoardClient({ board, users, projectId, projectName, proj
                   Syncing…
                 </span>
               ) : (
-                `${totalTasks} tasks`
+                `${visibleTaskCount}/${totalTasks} tasks`
               )}
             </div>
           </div>
+
+          {(showFilters || showSort) && (
+            <div className="mt-2 flex flex-wrap items-end gap-2 border-t border-gray-200 pt-2">
+              {showFilters && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Assignee</label>
+                    <select
+                      value={assigneeFilter}
+                      onChange={(event) => setAssigneeFilter(event.target.value)}
+                      className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value="ALL">All assignees</option>
+                      {assignableUsers.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Priority</label>
+                    <select
+                      value={priorityFilter}
+                      onChange={(event) => setPriorityFilter(event.target.value)}
+                      className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value="ALL">All priorities</option>
+                      <option value="HIGH">High</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="LOW">Low</option>
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                  >
+                    Clear filters
+                  </button>
+                </>
+              )}
+
+              {showSort && (
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Sort by</label>
+                  <select
+                    value={sortOption}
+                    onChange={(event) => setSortOption(event.target.value as SortOption)}
+                    className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="updated-desc">Recently updated</option>
+                    <option value="updated-asc">Oldest updated</option>
+                    <option value="priority-desc">Priority: high to low</option>
+                    <option value="priority-asc">Priority: low to high</option>
+                    <option value="title-asc">Title: A to Z</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="h-full overflow-x-auto">
           <div className="flex min-w-max gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4">
-            {COLUMNS.map((col) => (
+            {COLUMNS.map((column) => (
               <Column
-                key={col.id}
-                id={col.id}
-                label={col.label}
-                color={col.color}
-                tasks={tasksByStatus[col.id]}
-                users={users}
+                key={column.id}
+                id={column.id}
+                label={column.label}
+                color={column.color}
+                tasks={tasksByStatus[column.id]}
+                users={assignableUsers}
                 boardId={board.id}
                 onTaskUpdate={handleTaskUpdate}
                 onTaskDelete={handleTaskDelete}
@@ -398,10 +630,33 @@ export default function BoardClient({ board, users, projectId, projectName, proj
       <DragOverlay>
         {activeTask && (
           <div className="w-[300px] rotate-1 scale-[1.01] sm:w-[320px]">
-            <TaskCard task={activeTask} users={users} onUpdate={handleTaskUpdate} onDelete={handleTaskDelete} isDragging />
+            <TaskCard task={activeTask} users={assignableUsers} onUpdate={handleTaskUpdate} onDelete={handleTaskDelete} isDragging />
           </div>
         )}
       </DragOverlay>
+
+      {showMembers && (
+        <ProjectMembersModal
+          projectId={projectId}
+          allUsers={users}
+          members={members}
+          onClose={() => setShowMembers(false)}
+          onSave={setMembers}
+        />
+      )}
+
+      {showProjectSettings && (
+        <ProjectSettingsModal
+          projectId={projectId}
+          projectName={currentProjectName}
+          projectDescription={currentProjectDescription}
+          onClose={() => setShowProjectSettings(false)}
+          onUpdate={(name, description) => {
+            setCurrentProjectName(name)
+            setCurrentProjectDescription(description)
+          }}
+        />
+      )}
     </DndContext>
   )
 }

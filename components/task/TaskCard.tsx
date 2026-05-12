@@ -56,6 +56,22 @@ function getRelativeTime(dateValue: string | Date) {
   return formatter.format(-elapsedDays, 'day')
 }
 
+function formatDueDate(dateValue: string | Date | null) {
+  if (!dateValue) return null
+  const date = new Date(dateValue)
+  if (isNaN(date.getTime())) return null
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function isDueDateOverdue(dateValue: string | Date | null) {
+  if (!dateValue) return false
+  const date = new Date(dateValue)
+  if (isNaN(date.getTime())) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return date < today
+}
+
 function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps) {
   const [showModal, setShowModal] = useState(false)
   const dragIntentRef = useRef(false)
@@ -145,6 +161,29 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
           <p className="mt-1 line-clamp-2 text-xs leading-4 text-gray-600">{task.description}</p>
         )}
 
+        {task.dueDate && (
+          <div className="mt-1.5">
+            {(() => {
+              const label = formatDueDate(task.dueDate)
+              const overdue = isDueDateOverdue(task.dueDate)
+              return label ? (
+                <span
+                  className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium ${
+                    overdue
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : 'border-gray-200 bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                  </svg>
+                  {overdue ? `Overdue · ${label}` : label}
+                </span>
+              ) : null
+            })()}
+          </div>
+        )}
+
         <div className="mt-2.5 flex items-center justify-between gap-2 text-[11px] text-gray-500">
           <div className="flex min-w-0 items-center gap-1.5">
             {task.assignee ? (
@@ -166,9 +205,9 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
             <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">{STATUS_LABELS[task.status] ?? task.status}</span>
             <span className="inline-flex items-center gap-1" aria-label="Comments count">
               <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path d="M18 10c0 .552-.448 1-1 1H6.414l3.293 3.293a1 1 0 11-1.414 1.414l-5-5a.997.997 0 010-1.414l5-5a1 1 0 111.414 1.414L6.414 9H17c.552 0 1 .448 1 1Z" />
+                <path d="M4 4h12a2 2 0 012 2v7a2 2 0 01-2 2H9.414L6 18.414A1 1 0 014.293 17.7L4.586 15H4a2 2 0 01-2-2V6a2 2 0 012-2Z" />
               </svg>
-              0
+              {task.commentCount}
             </span>
             <span className="inline-flex items-center gap-1" aria-label="Attachments count">
               <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
