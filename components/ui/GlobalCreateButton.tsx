@@ -21,13 +21,21 @@ type CreateMode = 'project' | 'task'
 const INPUT_CLASS =
   'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
 
+function getDefaultTaskProjectId(projects: QuickCreateProject[], currentProjectId?: string) {
+  if (currentProjectId && projects.some((project) => project.id === currentProjectId)) {
+    return currentProjectId
+  }
+
+  return projects[0]?.id ?? ''
+}
+
 export default function GlobalCreateButton({ projects, users }: GlobalCreateButtonProps) {
   const taskProjects = useMemo(() => projects.filter((project) => project.boardId), [projects])
   const [isOpen, setIsOpen] = useState(false)
   const [mode, setMode] = useState<CreateMode>('task')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [projectId, setProjectId] = useState(taskProjects[0]?.id ?? '')
+  const [projectId, setProjectId] = useState(() => getDefaultTaskProjectId(projects.filter((project) => project.boardId)))
   const [status, setStatus] = useState<TaskStatus>('TODO')
   const [priority, setPriority] = useState<TaskPriority>('MEDIUM')
   const [assigneeId, setAssigneeId] = useState('')
@@ -48,18 +56,7 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, isSaving])
 
-  const resolvedProjectId = useMemo(() => {
-    if (taskProjects.some((project) => project.id === projectId)) {
-      return projectId
-    }
-
-    return taskProjects[0]?.id ?? ''
-  }, [projectId, taskProjects])
-
-  const selectedProject = useMemo(
-    () => taskProjects.find((project) => project.id === resolvedProjectId) ?? null,
-    [resolvedProjectId, taskProjects]
-  )
+  const selectedProject = useMemo(() => taskProjects.find((project) => project.id === projectId) ?? taskProjects[0] ?? null, [projectId, taskProjects])
 
   const resetState = () => {
     setName('')
@@ -125,7 +122,7 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
         type="button"
         onClick={() => {
           setMode(taskProjects.length > 0 ? 'task' : 'project')
-          setProjectId((currentProjectId) => currentProjectId || taskProjects[0]?.id || '')
+          setProjectId((currentProjectId) => getDefaultTaskProjectId(taskProjects, currentProjectId))
           setIsOpen(true)
         }}
         className="rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700"
@@ -181,7 +178,10 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
                 <div className="inline-flex rounded-lg bg-gray-100 p-1">
                   <button
                     type="button"
-                    onClick={() => setMode('task')}
+                    onClick={() => {
+                      setMode('task')
+                      setProjectId((currentProjectId) => getDefaultTaskProjectId(taskProjects, currentProjectId))
+                    }}
                     disabled={taskProjects.length === 0}
                     className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                       mode === 'task' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
@@ -214,7 +214,7 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
                       <div className="space-y-3">
                         <div>
                           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">Project</label>
-                          <select value={resolvedProjectId} onChange={(event) => setProjectId(event.target.value)} className={INPUT_CLASS}>
+                          <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className={INPUT_CLASS}>
                             {taskProjects.map((project) => (
                               <option key={project.id} value={project.id}>
                                 {project.name}

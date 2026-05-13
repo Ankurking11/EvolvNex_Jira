@@ -79,7 +79,7 @@ model Comment {
   taskId    String   @db.Uuid @map("task_id")
   authorId  String?  @db.Uuid @map("author_id")
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  author    User?    @relation(fields: [authorId], references: [id])
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("comments")
