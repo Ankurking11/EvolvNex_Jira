@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { ReactNode, useEffect, useMemo, useState } from 'react'
+import { ReactNode, useMemo, useState } from 'react'
 import { BoardUser } from '@/lib/board-types'
 import GlobalCreateButton from '@/components/ui/GlobalCreateButton'
 
@@ -36,12 +36,16 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
   const searchParams = useSearchParams()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [quickCreateProjects, setQuickCreateProjects] = useState(projects)
+  const [createdProjects, setCreatedProjects] = useState<AppShellProps['projects']>([])
   const currentView = searchParams.get('view') ?? 'dashboard'
 
-  useEffect(() => {
-    setQuickCreateProjects(projects)
-  }, [projects])
+  const quickCreateProjects = useMemo(() => {
+    const projectMap = new Map(projects.map((project) => [project.id, project]))
+    createdProjects.forEach((project) => {
+      projectMap.set(project.id, project)
+    })
+    return Array.from(projectMap.values())
+  }, [createdProjects, projects])
 
   const breadcrumbs = useMemo(() => {
     const segments = pathname.split('/').filter(Boolean)
@@ -145,7 +149,7 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
               projects={quickCreateProjects}
               users={users}
               onProjectCreated={(project) => {
-                setQuickCreateProjects((previous) =>
+                setCreatedProjects((previous) =>
                   previous.some((existingProject) => existingProject.id === project.id) ? previous : [...previous, project]
                 )
               }}

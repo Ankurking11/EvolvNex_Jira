@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { createProject, createTask, TaskPriority, TaskStatus } from '@/lib/actions'
@@ -34,7 +34,6 @@ function getDefaultTaskProjectId(projects: QuickCreateProject[], currentProjectI
 export default function GlobalCreateButton({ projects, users, onProjectCreated }: GlobalCreateButtonProps) {
   const taskProjects = useMemo(() => projects.filter((project) => project.boardId), [projects])
   const [isOpen, setIsOpen] = useState(false)
-  const [isClient, setIsClient] = useState(false)
   const [mode, setMode] = useState<CreateMode>('task')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -48,9 +47,19 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const previousActiveElementRef = useRef<HTMLElement | null>(null)
 
-  useEffect(() => {
-    setIsClient(true)
+  const resetState = useCallback(() => {
+    setName('')
+    setDescription('')
+    setStatus('TODO')
+    setPriority('MEDIUM')
+    setAssigneeId('')
+    setError(null)
   }, [])
+
+  const closeModal = useCallback(() => {
+    setIsOpen(false)
+    resetState()
+  }, [resetState])
 
   useEffect(() => {
     if (!isOpen) return
@@ -118,23 +127,9 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
       document.body.style.overflow = previousOverflow
       previousActiveElementRef.current?.focus()
     }
-  }, [isOpen, isSaving])
+  }, [closeModal, isOpen, isSaving])
 
   const selectedProject = useMemo(() => taskProjects.find((project) => project.id === projectId) ?? taskProjects[0] ?? null, [projectId, taskProjects])
-
-  const resetState = () => {
-    setName('')
-    setDescription('')
-    setStatus('TODO')
-    setPriority('MEDIUM')
-    setAssigneeId('')
-    setError(null)
-  }
-
-  const closeModal = () => {
-    setIsOpen(false)
-    resetState()
-  }
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -199,8 +194,7 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
         + Create
       </button>
 
-      {isClient &&
-        isOpen &&
+      {isOpen &&
         createPortal(
         <div
           className="fixed inset-0 z-40 overflow-y-auto bg-black/50 p-4"
