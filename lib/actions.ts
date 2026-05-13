@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from './prisma'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_cache, revalidateTag } from 'next/cache'
 import { BoardComment, BoardTask, BoardUser } from './board-types'
 
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE'
@@ -127,7 +127,7 @@ export async function getBoardData(projectId: string) {
 }
 
 export async function getProjects() {
-  try {
+  const fetchProjects = async () => {
     const commentsAvailable = await hasCommentsTable()
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
@@ -191,6 +191,10 @@ export async function getProjects() {
           }
         : project.board,
     }))
+  }
+
+  try {
+    return await unstable_cache(fetchProjects, ['projects'])()
   } catch (error) {
     console.error('[getProjects] Failed to fetch projects', error)
     return []
@@ -386,6 +390,7 @@ export async function createTask(data: {
     if (data.assigneeId) {
       await ensureProjectMember(task.board.projectId, data.assigneeId)
     }
+    revalidateTag('projects')
     revalidateProjectAndDashboard(task.board.projectId)
     return serializeTask(task)
   } catch (error) {
@@ -438,6 +443,7 @@ export async function updateTask(
     if (task.assigneeId) {
       await ensureProjectMember(task.board.projectId, task.assigneeId)
     }
+    revalidateTag('projects')
     revalidateProjectAndDashboard(task.board.projectId)
     return serializeTask(task)
   } catch (error) {
@@ -509,8 +515,8 @@ export async function createProject(data: { name: string; description?: string }
         },
       },
     })
+    revalidateTag('projects')
     revalidateProjectAndDashboard(project.id)
-    revalidatePath('/', 'layout')
     return project
   } catch (error) {
     console.error('[createProject] Failed to create project', { name: data.name }, error)
@@ -524,6 +530,7 @@ export async function updateProject(projectId: string, data: { name?: string; de
       where: { id: projectId },
       data,
     })
+    revalidateTag('projects')
     revalidateProjectAndDashboard(projectId)
     return project
   } catch (error) {
@@ -537,6 +544,7 @@ export async function deleteProject(projectId: string) {
     await prisma.project.delete({
       where: { id: projectId },
     })
+    revalidateTag('projects')
     revalidatePath('/dashboard')
   } catch (error) {
     console.error('[deleteProject] Failed to delete project', { projectId }, error)
