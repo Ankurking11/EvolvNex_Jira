@@ -41,10 +41,9 @@ function serializeComment(comment: {
   id: string
   content: string
   taskId: string
-  authorId: string
-  author: BoardUser
+  authorId: string | null
+  author: BoardUser | null
   createdAt: Date
-  updatedAt: Date
 }): BoardComment {
   return {
     id: comment.id,
@@ -53,7 +52,19 @@ function serializeComment(comment: {
     authorId: comment.authorId,
     author: comment.author,
     createdAt: comment.createdAt,
-    updatedAt: comment.updatedAt,
+  }
+}
+
+async function hasCommentsTable() {
+  try {
+    const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT to_regclass('public.comments') IS NOT NULL AS "exists"
+    `
+
+    return result[0]?.exists ?? false
+  } catch (error) {
+    console.warn('[hasCommentsTable] Failed to inspect comments table availability', error)
+    return false
   }
 }
 
@@ -67,6 +78,7 @@ function revalidateProjectAndDashboard(projectId: string) {
 
 export async function getBoardData(projectId: string) {
   try {
+    const commentsAvailable = await hasCommentsTable()
     const board = await prisma.board.findFirst({
       where: { projectId },
       include: {
@@ -87,11 +99,15 @@ export async function getBoardData(projectId: string) {
         tasks: {
           include: {
             assignee: true,
-            _count: {
-              select: {
-                comments: true,
-              },
-            },
+            ...(commentsAvailable
+              ? {
+                  _count: {
+                    select: {
+                      comments: true,
+                    },
+                  },
+                }
+              : {}),
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -112,7 +128,8 @@ export async function getBoardData(projectId: string) {
 
 export async function getProjects() {
   try {
-    return await prisma.project.findMany({
+    const commentsAvailable = await hasCommentsTable()
+    const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         members: {
@@ -140,17 +157,40 @@ export async function getProjects() {
                     email: true,
                   },
                 },
-                _count: {
-                  select: {
-                    comments: true,
-                  },
-                },
+                ...(commentsAvailable
+                  ? {
+                      _count: {
+                        select: {
+                          comments: true,
+                        },
+                      },
+                    }
+                  : {}),
               },
             },
           },
         },
       },
     })
+
+    if (commentsAvailable) {
+      return projects
+    }
+
+    return projects.map((project) => ({
+      ...project,
+      board: project.board
+        ? {
+            ...project.board,
+            tasks: project.board.tasks.map((task) => ({
+              ...task,
+              _count: {
+                comments: 0,
+              },
+            })),
+          }
+        : project.board,
+    }))
   } catch (error) {
     console.error('[getProjects] Failed to fetch projects', error)
     return []
@@ -242,6 +282,10 @@ export async function updateProjectMembers(projectId: string, userIds: string[])
 
 export async function getTaskComments(taskId: string) {
   try {
+    if (!(await hasCommentsTable())) {
+      return []
+    }
+
     const comments = await prisma.comment.findMany({
       where: { taskId },
       include: {
@@ -264,6 +308,10 @@ export async function createTaskComment(data: { taskId: string; authorId: string
   }
 
   try {
+    if (!(await hasCommentsTable())) {
+      throw new Error('Comments are unavailable until the comments migration is applied.')
+    }
+
     const comment = await prisma.comment.create({
       data: {
         content,
@@ -308,6 +356,7 @@ export async function createTask(data: {
   dueDate?: string | null
 }) {
   try {
+    const commentsAvailable = await hasCommentsTable()
     const task = await prisma.task.create({
       data: {
         title: data.title,
@@ -323,11 +372,15 @@ export async function createTask(data: {
         board: {
           select: { projectId: true },
         },
-        _count: {
-          select: {
-            comments: true,
-          },
-        },
+        ...(commentsAvailable
+          ? {
+              _count: {
+                select: {
+                  comments: true,
+                },
+              },
+            }
+          : {}),
       },
     })
     if (data.assigneeId) {
@@ -353,6 +406,7 @@ export async function updateTask(
   }
 ) {
   try {
+    const commentsAvailable = await hasCommentsTable()
     const task = await prisma.task.update({
       where: { id: taskId },
       data: {
@@ -370,11 +424,15 @@ export async function updateTask(
         board: {
           select: { projectId: true },
         },
-        _count: {
-          select: {
-            comments: true,
-          },
-        },
+        ...(commentsAvailable
+          ? {
+              _count: {
+                select: {
+                  comments: true,
+                },
+              },
+            }
+          : {}),
       },
     })
     if (task.assigneeId) {
@@ -408,6 +466,7 @@ export async function deleteTask(taskId: string) {
 
 export async function moveTask(taskId: string, newStatus: TaskStatus) {
   try {
+    const commentsAvailable = await hasCommentsTable()
     const task = await prisma.task.update({
       where: { id: taskId },
       data: { status: newStatus },
@@ -416,11 +475,15 @@ export async function moveTask(taskId: string, newStatus: TaskStatus) {
         board: {
           select: { projectId: true },
         },
-        _count: {
-          select: {
-            comments: true,
-          },
-        },
+        ...(commentsAvailable
+          ? {
+              _count: {
+                select: {
+                  comments: true,
+                },
+              },
+            }
+          : {}),
       },
     })
     revalidateProjectAndDashboard(task.board.projectId)

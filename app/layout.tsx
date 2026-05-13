@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import './globals.css'
 import AppShell from '@/components/layout/AppShell'
-import { prisma } from '@/lib/prisma'
+import { getProjects, getUsers } from '@/lib/actions'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'EvolvNex Jira',
@@ -14,32 +16,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [projects, users] = await Promise.all([
-    prisma.project.findMany({
-      select: {
-        id: true,
-        name: true,
-        board: {
-          select: {
-            id: true,
-          },
-        },
-      },
-      orderBy: {
-        name: 'asc',
-      },
-    }),
-    prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-      },
-      orderBy: {
-        name: 'asc',
-      },
-    }),
-  ])
+  const [projects, users] = await Promise.all([getProjects(), getUsers()])
 
   return (
     <html lang="en">
