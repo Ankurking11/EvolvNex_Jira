@@ -501,8 +501,16 @@ export async function createProject(data: { name: string; description?: string }
         ...data,
         board: { create: {} },
       },
+      include: {
+        board: {
+          select: {
+            id: true,
+          },
+        },
+      },
     })
     revalidateProjectAndDashboard(project.id)
+    revalidatePath('/', 'layout')
     return project
   } catch (error) {
     console.error('[createProject] Failed to create project', { name: data.name }, error)
