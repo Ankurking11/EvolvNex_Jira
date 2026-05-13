@@ -29,11 +29,7 @@ export default async function RootLayout({
           }
         >
           <AppShell
-            projects={projects.map((project) => ({
-              id: project.id,
-              name: project.name,
-              boardId: project.board?.id ?? null,
-            }))}
+            projects={projects}
             users={users}
           >
             {children}

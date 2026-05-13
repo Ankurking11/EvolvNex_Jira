@@ -2,7 +2,7 @@
 
 import { prisma } from './prisma'
 import { revalidatePath } from 'next/cache'
-import { BoardComment, BoardTask, BoardUser } from './board-types'
+import { AppProject, BoardComment, BoardTask, BoardUser } from './board-types'
 
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE'
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
@@ -55,6 +55,62 @@ function serializeComment(comment: {
   }
 }
 
+function serializeProject(project: {
+  id: string
+  name: string
+  description: string | null
+  createdAt: Date
+  updatedAt: Date
+  members: Array<{
+    userId: string
+  }>
+  board: {
+    id: string
+    _count: {
+      tasks: number
+    }
+    tasks: Array<{
+      id: string
+      title: string
+      status: string
+      priority: string
+      updatedAt: Date
+      assigneeId: string | null
+      assignee: BoardUser | null
+      _count: {
+        comments: number
+      }
+    }>
+  } | null
+}): AppProject {
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
+    members: project.members.map((member) => ({
+      userId: member.userId,
+    })),
+    board: project.board
+      ? {
+          id: project.board.id,
+          _count: project.board._count,
+          tasks: project.board.tasks.map((task) => ({
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            priority: task.priority,
+            updatedAt: task.updatedAt.toISOString(),
+            assigneeId: task.assigneeId,
+            assignee: task.assignee,
+            _count: task._count,
+          })),
+        }
+      : null,
+  }
+}
+
 async function hasCommentsTable() {
   try {
     const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
@@ -69,11 +125,14 @@ async function hasCommentsTable() {
 }
 
 /**
- * Keeps dashboard aggregate cards and the project board page in sync after task mutations.
+ * Keeps layout, dashboard, and board views aligned after task and project mutations.
  */
-function revalidateProjectAndDashboard(projectId: string) {
+function revalidateWorkspace(projectId?: string) {
+  revalidatePath('/', 'layout')
   revalidatePath('/dashboard')
-  revalidatePath(`/project/${projectId}`)
+  if (projectId) {
+    revalidatePath(`/project/${projectId}`)
+  }
 }
 
 export async function getBoardData(projectId: string) {
@@ -114,6 +173,15 @@ export async function getBoardData(projectId: string) {
       },
     })
     if (!board) return null
+
+    console.debug('[getBoardData] Loaded board data', {
+      projectId,
+      boardId: board.id,
+      taskIds: board.tasks.map((task) => task.id),
+      taskCount: board.tasks.length,
+      memberIds: board.project.members.map((member) => member.userId),
+      memberCount: board.project.members.length,
+    })
 
     return {
       id: board.id,
@@ -173,24 +241,33 @@ export async function getProjects() {
       },
     })
 
-    if (commentsAvailable) {
-      return projects
-    }
+    const normalizedProjects = projects.map((project) =>
+      serializeProject({
+        ...project,
+        description: project.description ?? null,
+        board: project.board
+          ? {
+              ...project.board,
+              tasks: project.board.tasks.map((task) => ({
+                ...task,
+                _count: commentsAvailable
+                  ? task._count
+                  : {
+                      comments: 0,
+                    },
+              })),
+            }
+          : project.board,
+      })
+    )
 
-    return projects.map((project) => ({
-      ...project,
-      board: project.board
-        ? {
-            ...project.board,
-            tasks: project.board.tasks.map((task) => ({
-              ...task,
-              _count: {
-                comments: 0,
-              },
-            })),
-          }
-        : project.board,
-    }))
+    console.debug('[getProjects] Loaded projects', {
+      projectIds: normalizedProjects.map((project) => project.id),
+      projectCount: normalizedProjects.length,
+      boardIds: normalizedProjects.map((project) => project.board?.id ?? null),
+    })
+
+    return normalizedProjects
   } catch (error) {
     console.error('[getProjects] Failed to fetch projects', error)
     return []
@@ -259,7 +336,7 @@ export async function updateProjectMembers(projectId: string, userIds: string[])
       }
     })
 
-    revalidateProjectAndDashboard(projectId)
+    revalidateWorkspace(projectId)
 
     const members = await prisma.projectMember.findMany({
       where: { projectId },
@@ -333,7 +410,7 @@ export async function createTaskComment(data: { taskId: string; authorId: string
     })
 
     await ensureProjectMember(comment.task.board.projectId, data.authorId)
-    revalidateProjectAndDashboard(comment.task.board.projectId)
+    revalidateWorkspace(comment.task.board.projectId)
 
     return serializeComment({
       ...comment,
@@ -386,7 +463,7 @@ export async function createTask(data: {
     if (data.assigneeId) {
       await ensureProjectMember(task.board.projectId, data.assigneeId)
     }
-    revalidateProjectAndDashboard(task.board.projectId)
+    revalidateWorkspace(task.board.projectId)
     return serializeTask(task)
   } catch (error) {
     console.error('[createTask] Failed to create task', { boardId: data.boardId, title: data.title }, error)
@@ -438,7 +515,7 @@ export async function updateTask(
     if (task.assigneeId) {
       await ensureProjectMember(task.board.projectId, task.assigneeId)
     }
-    revalidateProjectAndDashboard(task.board.projectId)
+    revalidateWorkspace(task.board.projectId)
     return serializeTask(task)
   } catch (error) {
     console.error('[updateTask] Failed to update task', { taskId }, error)
@@ -457,7 +534,7 @@ export async function deleteTask(taskId: string) {
       },
     })
 
-    revalidateProjectAndDashboard(deletedTask.board.projectId)
+    revalidateWorkspace(deletedTask.board.projectId)
   } catch (error) {
     console.error('[deleteTask] Failed to delete task', { taskId }, error)
     throw error
@@ -486,7 +563,7 @@ export async function moveTask(taskId: string, newStatus: TaskStatus) {
           : {}),
       },
     })
-    revalidateProjectAndDashboard(task.board.projectId)
+    revalidateWorkspace(task.board.projectId)
     return serializeTask(task)
   } catch (error) {
     console.error('[moveTask] Failed to move task', { taskId, newStatus }, error)
@@ -509,9 +586,29 @@ export async function createProject(data: { name: string; description?: string }
         },
       },
     })
-    revalidateProjectAndDashboard(project.id)
-    revalidatePath('/', 'layout')
-    return project
+    const serializedProject = serializeProject({
+      ...project,
+      description: project.description ?? null,
+      members: [],
+      board: project.board
+        ? {
+            id: project.board.id,
+            _count: {
+              tasks: 0,
+            },
+            tasks: [],
+          }
+        : null,
+    })
+
+    console.debug('[createProject] Created project successfully', {
+      projectId: serializedProject.id,
+      projectName: serializedProject.name,
+      boardId: serializedProject.board?.id ?? null,
+    })
+
+    revalidateWorkspace(project.id)
+    return serializedProject
   } catch (error) {
     console.error('[createProject] Failed to create project', { name: data.name }, error)
     throw error
@@ -524,7 +621,7 @@ export async function updateProject(projectId: string, data: { name?: string; de
       where: { id: projectId },
       data,
     })
-    revalidateProjectAndDashboard(projectId)
+    revalidateWorkspace(projectId)
     return project
   } catch (error) {
     console.error('[updateProject] Failed to update project', { projectId }, error)
@@ -537,7 +634,7 @@ export async function deleteProject(projectId: string) {
     await prisma.project.delete({
       where: { id: projectId },
     })
-    revalidatePath('/dashboard')
+    revalidateWorkspace(projectId)
   } catch (error) {
     console.error('[deleteProject] Failed to delete project', { projectId }, error)
     throw error

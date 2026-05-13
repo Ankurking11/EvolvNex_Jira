@@ -33,3 +33,65 @@ export type BoardData = {
   tasks: BoardTask[]
   members: BoardUser[]
 }
+
+export type AppProjectTask = {
+  id: string
+  title: string
+  status: string
+  priority: string
+  updatedAt: string | Date
+  assigneeId: string | null
+  assignee: BoardUser | null
+  _count: {
+    comments: number
+  }
+}
+
+export type AppProject = {
+  id: string
+  name: string
+  description: string | null
+  createdAt: string | Date
+  updatedAt: string | Date
+  members: Array<{
+    userId: string
+  }>
+  board: {
+    id: string
+    _count: {
+      tasks: number
+    }
+    tasks: AppProjectTask[]
+  } | null
+}
+
+export type AppProjectTask = {
+  id: string
+  title: string
+  status: string
+  priority: string
+  updatedAt: string | Date
+  assigneeId: string | null
+  assignee: BoardUser | null
+  _count: {
+    comments: number
+  }
+}
+
+export type AppProject = {
+  id: string
+  name: string
+  description: string | null
+  createdAt: string | Date
+  updatedAt: string | Date
+  members: Array<{
+    userId: string
+  }>
+  board: {
+    id: string
+    _count: {
+      tasks: number
+    }
+    tasks: AppProjectTask[]
+  } | null
+}

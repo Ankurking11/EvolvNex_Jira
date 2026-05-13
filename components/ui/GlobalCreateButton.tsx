@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { createProject, createTask, TaskPriority, TaskStatus } from '@/lib/actions'
 import { BoardUser } from '@/lib/board-types'
+import { useProjectState } from '@/components/layout/ProjectStateProvider'
 
 interface QuickCreateProject {
   id: string
@@ -15,7 +16,6 @@ interface QuickCreateProject {
 interface GlobalCreateButtonProps {
   projects: QuickCreateProject[]
   users: BoardUser[]
-  onProjectCreated?: (project: QuickCreateProject) => void
 }
 
 type CreateMode = 'project' | 'task'
@@ -31,7 +31,8 @@ function getDefaultTaskProjectId(projects: QuickCreateProject[], currentProjectI
   return projects[0]?.id ?? ''
 }
 
-export default function GlobalCreateButton({ projects, users, onProjectCreated }: GlobalCreateButtonProps) {
+export default function GlobalCreateButton({ projects, users }: GlobalCreateButtonProps) {
+  const { upsertProject } = useProjectState()
   const taskProjects = useMemo(() => projects.filter((project) => project.boardId), [projects])
   const [isOpen, setIsOpen] = useState(false)
   const [mode, setMode] = useState<CreateMode>('task')
@@ -43,6 +44,7 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
   const [assigneeId, setAssigneeId] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
   const router = useRouter()
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const previousActiveElementRef = useRef<HTMLElement | null>(null)
@@ -60,6 +62,19 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
     setIsOpen(false)
     resetState()
   }, [resetState])
+
+  const refreshRoute = useCallback(
+    (reason: string, href?: string) => {
+      console.debug('[GlobalCreateButton] router.refresh scheduled', { reason, href: href ?? null })
+      startTransition(() => {
+        if (href) {
+          router.push(href)
+        }
+        router.refresh()
+      })
+    },
+    [router, startTransition]
+  )
 
   useEffect(() => {
     if (!isOpen) return
@@ -125,11 +140,27 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
       window.clearTimeout(focusTimer)
       document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = previousOverflow
-      previousActiveElementRef.current?.focus()
+      window.requestAnimationFrame(() => {
+        if (previousActiveElementRef.current?.isConnected) {
+          previousActiveElementRef.current.focus()
+        }
+      })
     }
   }, [closeModal, isOpen, isSaving])
 
-  const selectedProject = useMemo(() => taskProjects.find((project) => project.id === projectId) ?? taskProjects[0] ?? null, [projectId, taskProjects])
+  useEffect(() => {
+    console.debug('[GlobalCreateButton] Project selector source updated', {
+      projectIds: taskProjects.map((project) => project.id),
+      projectCount: taskProjects.length,
+      boardIds: taskProjects.map((project) => project.boardId),
+    })
+  }, [taskProjects])
+
+  const resolvedProjectId = useMemo(() => getDefaultTaskProjectId(taskProjects, projectId), [projectId, taskProjects])
+  const selectedProject = useMemo(
+    () => taskProjects.find((project) => project.id === resolvedProjectId) ?? taskProjects[0] ?? null,
+    [resolvedProjectId, taskProjects]
+  )
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -144,15 +175,10 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
           name: name.trim(),
           description: description.trim() || undefined,
         })
-        onProjectCreated?.({
-          id: project.id,
-          name: project.name,
-          boardId: project.board?.id ?? null,
-        })
+        upsertProject(project)
 
         closeModal()
-        router.push(`/project/${project.id}`)
-        router.refresh()
+        refreshRoute('create-project', `/project/${project.id}`)
         return
       }
 
@@ -170,8 +196,7 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
       })
 
       closeModal()
-      router.push(`/project/${selectedProject.id}`)
-      router.refresh()
+      refreshRoute('create-task', `/project/${selectedProject.id}`)
     } catch (saveError) {
       console.error('[GlobalCreateButton] Failed to create item', saveError)
       setError(mode === 'project' ? 'Failed to create project. Please try again.' : 'Failed to create task. Please try again.')
@@ -281,7 +306,7 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
                       <div className="space-y-3">
                         <div>
                           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">Project</label>
-                          <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className={INPUT_CLASS}>
+                          <select value={resolvedProjectId} onChange={(event) => setProjectId(event.target.value)} className={INPUT_CLASS}>
                             {taskProjects.map((project) => (
                               <option key={project.id} value={project.id}>
                                 {project.name}

@@ -162,6 +162,15 @@ function updateTasksIfChanged(previous: BoardTask[], next: BoardTask[]) {
   return hasTaskListChanged(previous, next) ? next : previous
 }
 
+function hasMemberListChanged(previous: BoardUser[], next: BoardUser[]) {
+  if (previous.length !== next.length) return true
+
+  return next.some((member, index) => {
+    const previousMember = previous[index]
+    return !previousMember || previousMember.id !== member.id || previousMember.name !== member.name || previousMember.email !== member.email
+  })
+}
+
 export default function BoardClient({ board, users, projectId, projectName, projectDescription }: BoardClientProps) {
   const [tasks, setTasks] = useState<BoardTask[]>(board.tasks)
   const [members, setMembers] = useState<BoardUser[]>(board.members)
@@ -189,8 +198,20 @@ export default function BoardClient({ board, users, projectId, projectName, proj
     boardTaskIdsRef.current = new Set(tasks.map((task) => task.id))
   }, [tasks])
 
+  useEffect(() => {
+    console.debug('[BoardClient] Project metadata hydrated', {
+      projectId,
+      boardId: board.id,
+      projectName: projectName ?? '',
+      hasDescription: Boolean(projectDescription),
+      taskIds: board.tasks.map((task) => task.id),
+      memberIds: board.members.map((member) => member.id),
+    })
+  }, [board.id, board.members, board.tasks, projectDescription, projectId, projectName])
+
   const refreshBoard = useCallback(async () => {
     const requestId = ++latestRefreshRequest.current
+    console.debug('[BoardClient] Refreshing board state', { projectId, boardId: board.id, requestId })
     setIsRefreshing(true)
 
     try {
@@ -205,9 +226,35 @@ export default function BoardClient({ board, users, projectId, projectName, proj
 
       if (requestId !== latestRefreshRequest.current || !parsedTasks) return
 
-      setTasks((previous) => updateTasksIfChanged(previous, parsedTasks))
+      setTasks((previous) => {
+        const nextTasks = updateTasksIfChanged(previous, parsedTasks)
+        if (nextTasks !== previous) {
+          console.debug('[BoardClient] Task state updated from refresh', {
+            projectId,
+            beforeTaskIds: previous.map((task) => task.id),
+            afterTaskIds: nextTasks.map((task) => task.id),
+            beforeCount: previous.length,
+            afterCount: nextTasks.length,
+          })
+        }
+        return nextTasks
+      })
       if (parsedMembers) {
-        setMembers(parsedMembers)
+        setMembers((previousMembers) => {
+          if (!hasMemberListChanged(previousMembers, parsedMembers)) {
+            return previousMembers
+          }
+
+          console.debug('[BoardClient] Member state updated from refresh', {
+            projectId,
+            beforeMemberIds: previousMembers.map((member) => member.id),
+            afterMemberIds: parsedMembers.map((member) => member.id),
+            beforeCount: previousMembers.length,
+            afterCount: parsedMembers.length,
+          })
+
+          return parsedMembers
+        })
       }
       setSyncError(null)
     } catch (error) {
@@ -218,7 +265,7 @@ export default function BoardClient({ board, users, projectId, projectName, proj
         setIsRefreshing(false)
       }
     }
-  }, [projectId])
+  }, [board.id, projectId])
 
   useEffect(() => {
     if (supabase && isRealtimeHealthy) return
@@ -246,10 +293,12 @@ export default function BoardClient({ board, users, projectId, projectName, proj
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks', filter: `board_id=eq.${board.id}` },
         () => {
+          console.debug('[BoardClient] Realtime task event received', { projectId, boardId: board.id })
           void refreshBoard()
         }
       )
       .subscribe((status) => {
+        console.debug('[BoardClient] Realtime task channel status', { projectId, boardId: board.id, status })
         if (status === 'SUBSCRIBED') {
           setIsRealtimeHealthy(true)
           setSyncError(null)
@@ -263,10 +312,11 @@ export default function BoardClient({ board, users, projectId, projectName, proj
       })
 
     return () => {
+      console.debug('[BoardClient] Realtime task channel removed', { projectId, boardId: board.id })
       setIsRealtimeHealthy(false)
       void supabase.removeChannel(channel)
     }
-  }, [board.id, refreshBoard, supabase])
+  }, [board.id, projectId, refreshBoard, supabase])
 
   useEffect(() => {
     if (!supabase) return
@@ -288,15 +338,17 @@ export default function BoardClient({ board, users, projectId, projectName, proj
           (typeof oldRecord?.task_id === 'string' ? oldRecord.task_id : null)
 
         if (taskId && boardTaskIdsRef.current.has(taskId)) {
+          console.debug('[BoardClient] Realtime comment event received', { projectId, boardId: board.id, taskId })
           void refreshBoard()
         }
       })
       .subscribe()
 
     return () => {
+      console.debug('[BoardClient] Realtime comment channel removed', { projectId, boardId: board.id })
       void supabase.removeChannel(channel)
     }
-  }, [board.id, refreshBoard, supabase])
+  }, [board.id, projectId, refreshBoard, supabase])
 
   useEffect(
     () => () => {

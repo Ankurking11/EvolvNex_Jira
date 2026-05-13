@@ -1,15 +1,8 @@
 import Link from 'next/link'
+import { AppProject } from '@/lib/board-types'
 
 interface ProjectCardProps {
-  project: {
-    id: string
-    name: string
-    description: string | null
-    board: {
-      tasks: { status: string }[]
-    } | null
-    createdAt: Date
-  }
+  project: AppProject
 }
 
 export default function ProjectCard({ project }: ProjectCardProps) {

@@ -25,9 +25,20 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   if (!board) notFound()
 
+  const boardStateKey = [
+    board.id,
+    project.id,
+    project.name,
+    project.description ?? '',
+    project.updatedAt.toISOString(),
+    board.members.map((member) => member.id).join(','),
+    board.tasks.map((task) => `${task.id}:${task.status}:${new Date(task.updatedAt).toISOString()}`).join(','),
+  ].join('|')
+
   return (
     <div className="h-full overflow-hidden">
       <BoardClient
+        key={boardStateKey}
         board={board}
         users={users}
         projectId={id}

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState, useTransition } from 'react'
 import { createProject } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
+import { useProjectState } from '@/components/layout/ProjectStateProvider'
 
 export default function CreateProjectButton() {
   const [isOpen, setIsOpen] = useState(false)
@@ -10,7 +11,16 @@ export default function CreateProjectButton() {
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
   const router = useRouter()
+  const { upsertProject } = useProjectState()
+
+  const refreshDashboard = useCallback(() => {
+    console.debug('[CreateProjectButton] router.refresh scheduled', { target: '/dashboard' })
+    startTransition(() => {
+      router.refresh()
+    })
+  }, [router, startTransition])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -18,11 +28,12 @@ export default function CreateProjectButton() {
     setLoading(true)
     setError(null)
     try {
-      await createProject({ name: name.trim(), description: description.trim() || undefined })
+      const project = await createProject({ name: name.trim(), description: description.trim() || undefined })
+      upsertProject(project)
       setName('')
       setDescription('')
       setIsOpen(false)
-      router.refresh()
+      refreshDashboard()
     } catch (err) {
       console.error('[CreateProjectButton] Failed to create project', err)
       setError('Failed to create project. Please try again.')
