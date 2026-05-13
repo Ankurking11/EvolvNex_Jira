@@ -328,6 +328,14 @@ async function ensureProjectMember(projectId: string, userId: string) {
   }
 }
 
+async function tryEnsureProjectMember(projectId: string, userId: string, source: string) {
+  try {
+    await ensureProjectMember(projectId, userId)
+  } catch (error) {
+    console.warn(`[${source}] Failed to sync project membership`, { projectId, userId }, error)
+  }
+}
+
 export async function updateProjectMembers(projectId: string, userIds: string[]) {
   const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)))
   if (!(await hasProjectMembersTable())) {
@@ -441,7 +449,7 @@ export async function createTaskComment(data: { taskId: string; authorId: string
       },
     })
 
-    await ensureProjectMember(comment.task.board.projectId, data.authorId)
+    await tryEnsureProjectMember(comment.task.board.projectId, data.authorId, 'createTaskComment')
     revalidateProjectAndDashboard(comment.task.board.projectId)
 
     return serializeComment({
@@ -570,7 +578,7 @@ export async function updateTask(
       },
     })
     if (task.assigneeId) {
-      await ensureProjectMember(task.board.projectId, task.assigneeId)
+      await tryEnsureProjectMember(task.board.projectId, task.assigneeId, 'updateTask')
     }
     revalidateTag('projects', 'max')
     revalidateProjectAndDashboard(task.board.projectId)

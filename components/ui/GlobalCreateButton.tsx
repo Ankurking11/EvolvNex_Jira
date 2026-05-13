@@ -146,7 +146,6 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
 
         closeModal()
         router.push(`/project/${project.id}`)
-        router.refresh()
         return
       }
 
@@ -165,7 +164,6 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
 
       closeModal()
       router.push(`/project/${selectedProject.id}`)
-      router.refresh()
     } catch (saveError) {
       console.error('[GlobalCreateButton] Failed to create item', saveError)
       setError(mode === 'project' ? 'Failed to create project. Please try again.' : 'Failed to create task. Please try again.')
