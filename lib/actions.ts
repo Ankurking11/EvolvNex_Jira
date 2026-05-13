@@ -132,11 +132,11 @@ export async function getProjects() {
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        // members: {
-        //   // include: {
-        //   //   user: true,
-        //   // },
-        // },
+        members: {
+          include: {
+            user: true,
+          },
+        },
         board: {
           include: {
             _count: {
@@ -188,8 +188,62 @@ export async function getProjects() {
   try {
     return await unstable_cache(fetchProjects, ['projects'], { revalidate: 30 })()
   } catch (error) {
-    console.error('[getProjects] Failed to fetch projects', error)
-    return []
+    console.error('[getProjects] Failed to fetch projects with members, trying without members', error)
+    // Fallback: fetch without members relation
+    try {
+      const projects = await prisma.project.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          board: {
+            include: {
+              _count: {
+                select: { tasks: true },
+              },
+              tasks: {
+                select: {
+                  id: true,
+                  title: true,
+                  status: true,
+                  priority: true,
+                  updatedAt: true,
+                  assigneeId: true,
+                  assignee: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                    },
+                  },
+                  _count: {
+                    select: {
+                      comments: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+
+      // Add empty members array for compatibility
+      const transformed = projects.map((project) => ({
+        ...project,
+        members: [],
+        board: project.board
+          ? {
+              ...project.board,
+              tasks: project.board.tasks.map((task) => ({
+                ...task,
+              })),
+            }
+          : project.board,
+      }))
+      return transformed
+    } catch (fallbackError) {
+      console.error('[getProjects] Fallback also failed', fallbackError)
+      return []
+    }
   }
 }
 
