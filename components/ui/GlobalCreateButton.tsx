@@ -35,7 +35,7 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
   const [mode, setMode] = useState<CreateMode>('task')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [projectId, setProjectId] = useState(() => getDefaultTaskProjectId(projects.filter((project) => project.boardId)))
+  const [projectId, setProjectId] = useState(() => getDefaultTaskProjectId(taskProjects))
   const [status, setStatus] = useState<TaskStatus>('TODO')
   const [priority, setPriority] = useState<TaskPriority>('MEDIUM')
   const [assigneeId, setAssigneeId] = useState('')
