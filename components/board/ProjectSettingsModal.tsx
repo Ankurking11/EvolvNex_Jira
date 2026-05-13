@@ -73,7 +73,6 @@ export default function ProjectSettingsModal({
     try {
       await deleteProject(projectId)
       router.push('/dashboard')
-      router.refresh()
     } catch (deleteError) {
       console.error('[ProjectSettingsModal] Failed to delete project', deleteError)
       setError('Failed to delete project. Please try again.')

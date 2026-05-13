@@ -181,6 +181,8 @@ export default function BoardClient({ board, users, projectId, projectName, proj
   const [currentProjectName, setCurrentProjectName] = useState(projectName ?? '')
   const [currentProjectDescription, setCurrentProjectDescription] = useState(projectDescription ?? null)
   const latestRefreshRequest = useRef(0)
+  const refreshInFlightRef = useRef(false)
+  const hasLoggedPollingErrorRef = useRef(false)
   const moveErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const boardTaskIdsRef = useRef<Set<string>>(new Set(board.tasks.map((task) => task.id)))
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
@@ -190,6 +192,11 @@ export default function BoardClient({ board, users, projectId, projectName, proj
   }, [tasks])
 
   const refreshBoard = useCallback(async () => {
+    if (refreshInFlightRef.current) {
+      return
+    }
+
+    refreshInFlightRef.current = true
     const requestId = ++latestRefreshRequest.current
     setIsRefreshing(true)
 
@@ -209,11 +216,16 @@ export default function BoardClient({ board, users, projectId, projectName, proj
       if (parsedMembers) {
         setMembers(parsedMembers)
       }
+      hasLoggedPollingErrorRef.current = false
       setSyncError(null)
     } catch (error) {
-      console.warn('Board polling error:', error)
+      if (!hasLoggedPollingErrorRef.current) {
+        console.warn('Board polling error:', error)
+        hasLoggedPollingErrorRef.current = true
+      }
       setSyncError('Board sync is delayed. Retrying automatically.')
     } finally {
+      refreshInFlightRef.current = false
       if (requestId === latestRefreshRequest.current) {
         setIsRefreshing(false)
       }

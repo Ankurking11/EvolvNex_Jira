@@ -15,6 +15,12 @@ function getViewLabel(view: DashboardView) {
   return 'Dashboard'
 }
 
+function getCommentCount(task: unknown) {
+  if (!task || typeof task !== 'object' || !('_count' in task)) return 0
+  const count = (task as { _count?: { comments?: number } })._count?.comments
+  return typeof count === 'number' ? count : 0
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -35,6 +41,9 @@ export default async function DashboardPage({
   const allTasks = projects.flatMap((project) =>
     (project.board?.tasks ?? []).map((task) => ({
       ...task,
+      _count: {
+        comments: getCommentCount(task),
+      },
       projectId: project.id,
       projectName: project.name,
       projectDescription: project.description,
@@ -223,7 +232,7 @@ export default async function DashboardPage({
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">{task.status}</span>
-                        <span>{task._count.comments} comments</span>
+                        <span>{getCommentCount(task)} comments</span>
                       </div>
                     </div>
                   </article>
@@ -260,7 +269,7 @@ export default async function DashboardPage({
                     <div className="space-y-2 text-sm text-gray-600">
                       <div className="flex items-center justify-between"><span>Total tasks</span><span className="font-semibold text-gray-900">{projectTasks.length}</span></div>
                       <div className="flex items-center justify-between"><span>Done</span><span className="font-semibold text-gray-900">{completedCount}</span></div>
-                      <div className="flex items-center justify-between"><span>Open comments</span><span className="font-semibold text-gray-900">{projectTasks.reduce((sum, task) => sum + task._count.comments, 0)}</span></div>
+                      <div className="flex items-center justify-between"><span>Open comments</span><span className="font-semibold text-gray-900">{projectTasks.reduce((sum, task) => sum + getCommentCount(task), 0)}</span></div>
                     </div>
                   </div>
                 )
