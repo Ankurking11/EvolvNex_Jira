@@ -38,7 +38,7 @@ export default async function DashboardPage({
       projectId: project.id,
       projectName: project.name,
       projectDescription: project.description,
-      memberCount: project.members.length,
+      memberCount: project.members?.length || 0,
     }))
   )
 

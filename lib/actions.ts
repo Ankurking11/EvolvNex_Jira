@@ -127,18 +127,15 @@ export async function getBoardData(projectId: string) {
 }
 
 export async function getProjects() {
-  console.log('[DEBUG] getProjects called')
   const fetchProjects = async () => {
-    console.log('[DEBUG] fetchProjects starting')
     const commentsAvailable = await hasCommentsTable()
-    console.log('[DEBUG] commentsAvailable:', commentsAvailable)
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         members: {
-          // include: {
-          //   user: true,
-          // },
+          include: {
+            user: true,
+          },
         },
         board: {
           include: {
@@ -171,7 +168,6 @@ export async function getProjects() {
         },
       },
     })
-    console.log('[DEBUG] prisma.project.findMany returned:', projects.length, 'projects')
 
     // Always add _count to tasks for consistent typing
     const transformed = projects.map((project) => ({
@@ -186,18 +182,68 @@ export async function getProjects() {
           }
         : project.board,
     }))
-    console.log('[DEBUG] returning transformed projects:', transformed.length)
     return transformed
   }
 
   try {
-    // const result = await unstable_cache(fetchProjects, ['projects'])()
-    const result = await fetchProjects()
-    console.log('[DEBUG] getProjects returning:', result.length, 'projects')
-    return result
+    return await unstable_cache(fetchProjects, ['projects'], { revalidate: 30 })()
   } catch (error) {
-    console.error('[getProjects] Failed to fetch projects', error)
-    return []
+    console.error('[getProjects] Failed to fetch projects with members, trying without members', error)
+    // Fallback: fetch without members relation
+    try {
+      const projects = await prisma.project.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          board: {
+            include: {
+              _count: {
+                select: { tasks: true },
+              },
+              tasks: {
+                select: {
+                  id: true,
+                  title: true,
+                  status: true,
+                  priority: true,
+                  updatedAt: true,
+                  assigneeId: true,
+                  assignee: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                    },
+                  },
+                  _count: {
+                    select: {
+                      comments: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+
+      // Add empty members array for compatibility
+      const transformed = projects.map((project) => ({
+        ...project,
+        members: [],
+        board: project.board
+          ? {
+              ...project.board,
+              tasks: project.board.tasks.map((task) => ({
+                ...task,
+              })),
+            }
+          : project.board,
+      }))
+      return transformed
+    } catch (fallbackError) {
+      console.error('[getProjects] Fallback also failed', fallbackError)
+      return []
+    }
   }
 }
 
