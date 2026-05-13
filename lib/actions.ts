@@ -160,15 +160,11 @@ export async function getProjects() {
                     email: true,
                   },
                 },
-                // ...(commentsAvailable
-                //   ? {
-                //       _count: {
-                //         select: {
-                //           comments: true,
-                //         },
-                //       },
-                //     }
-                //   : {}),
+                _count: {
+                  select: {
+                    comments: true,
+                  },
+                },
               },
             },
           },
@@ -185,7 +181,7 @@ export async function getProjects() {
             ...project.board,
             tasks: project.board.tasks.map((task) => ({
               ...task,
-              _count: task._count || { comments: 0 },
+              // _count already included in select
             })),
           }
         : project.board,
