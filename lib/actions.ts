@@ -217,7 +217,9 @@ export async function getProjects() {
     // Always add _count to tasks for consistent typing
     const transformed = projects.map((project) => ({
       ...project,
-      members: projectMembersAvailable ? (project as { members?: unknown[] }).members ?? [] : [],
+      members: projectMembersAvailable
+        ? (project as { members?: Array<{ userId: string }> }).members ?? []
+        : [],
       board: project.board
         ? {
             ...project.board,
@@ -517,7 +519,7 @@ export async function createTask(data: {
       return createdTask
     })
 
-    revalidateTag('projects', {})
+    revalidateTag('projects', 'max')
     revalidateProjectAndDashboard(task.board.projectId)
     return serializeTask(task)
   } catch (error) {
@@ -570,7 +572,7 @@ export async function updateTask(
     if (task.assigneeId) {
       await ensureProjectMember(task.board.projectId, task.assigneeId)
     }
-    revalidateTag('projects', {})
+    revalidateTag('projects', 'max')
     revalidateProjectAndDashboard(task.board.projectId)
     return serializeTask(task)
   } catch (error) {
@@ -642,7 +644,7 @@ export async function createProject(data: { name: string; description?: string }
         },
       },
     })
-    revalidateTag('projects', {})
+    revalidateTag('projects', 'max')
     revalidateProjectAndDashboard(project.id)
     return project
   } catch (error) {
@@ -657,7 +659,7 @@ export async function updateProject(projectId: string, data: { name?: string; de
       where: { id: projectId },
       data,
     })
-    revalidateTag('projects', {})
+    revalidateTag('projects', 'max')
     revalidateProjectAndDashboard(projectId)
     return project
   } catch (error) {
@@ -671,7 +673,7 @@ export async function deleteProject(projectId: string) {
     await prisma.project.delete({
       where: { id: projectId },
     })
-    revalidateTag('projects', {})
+    revalidateTag('projects', 'max')
     revalidatePath('/dashboard')
   } catch (error) {
     console.error('[deleteProject] Failed to delete project', { projectId }, error)
