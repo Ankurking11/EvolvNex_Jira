@@ -134,46 +134,46 @@ export async function getProjects() {
     console.log('[DEBUG] commentsAvailable:', commentsAvailable)
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
-      // include: {
-      //   // members: {
-      //   //   include: {
-      //   //     user: true,
-      //   //   },
-      //   // },
-      //   board: {
-      //     include: {
-      //       _count: {
-      //         select: { tasks: true },
-      //       },
-      //       tasks: {
-      //         select: {
-      //           id: true,
-      //           title: true,
-      //           status: true,
-      //           priority: true,
-      //           updatedAt: true,
-      //           assigneeId: true,
-      //           assignee: {
-      //             select: {
-      //               id: true,
-      //               name: true,
-      //               email: true,
-      //             },
-      //           },
-      //           // ...(commentsAvailable
-      //           //   ? {
-      //           //       _count: {
-      //           //         select: {
-      //           //           comments: true,
-      //           //         },
-      //           //       },
-      //           //     }
-      //           //   : {}),
-      //         },
-      //       },
-      //     },
-      //   },
-      // },
+      include: {
+        // members: {
+        //   include: {
+        //     user: true,
+        //   },
+        // },
+        board: {
+          include: {
+            _count: {
+              select: { tasks: true },
+            },
+            tasks: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                priority: true,
+                updatedAt: true,
+                assigneeId: true,
+                assignee: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+                // ...(commentsAvailable
+                //   ? {
+                //       _count: {
+                //         select: {
+                //           comments: true,
+                //         },
+                //       },
+                //     }
+                //   : {}),
+              },
+            },
+          },
+        },
+      },
     })
     console.log('[DEBUG] prisma.project.findMany returned:', projects.length, 'projects')
 
