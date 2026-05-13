@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { createProject, createTask, TaskPriority, TaskStatus } from '@/lib/actions'
 import { BoardUser } from '@/lib/board-types'
@@ -14,6 +15,7 @@ interface QuickCreateProject {
 interface GlobalCreateButtonProps {
   projects: QuickCreateProject[]
   users: BoardUser[]
+  onProjectCreated?: (project: QuickCreateProject) => void
 }
 
 type CreateMode = 'project' | 'task'
@@ -29,7 +31,7 @@ function getDefaultTaskProjectId(projects: QuickCreateProject[], currentProjectI
   return projects[0]?.id ?? ''
 }
 
-export default function GlobalCreateButton({ projects, users }: GlobalCreateButtonProps) {
+export default function GlobalCreateButton({ projects, users, onProjectCreated }: GlobalCreateButtonProps) {
   const taskProjects = useMemo(() => projects.filter((project) => project.boardId), [projects])
   const [isOpen, setIsOpen] = useState(false)
   const [mode, setMode] = useState<CreateMode>('task')
@@ -42,35 +44,92 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+  const previousActiveElementRef = useRef<HTMLElement | null>(null)
 
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isSaving) {
-        setIsOpen(false)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, isSaving])
-
-  const selectedProject = useMemo(() => taskProjects.find((project) => project.id === projectId) ?? taskProjects[0] ?? null, [projectId, taskProjects])
-
-  const resetState = () => {
+  const resetState = useCallback(() => {
     setName('')
     setDescription('')
     setStatus('TODO')
     setPriority('MEDIUM')
     setAssigneeId('')
     setError(null)
-  }
+  }, [])
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setIsOpen(false)
     resetState()
-  }
+  }, [resetState])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const previouslyFocused = document.activeElement
+    if (previouslyFocused instanceof HTMLElement) {
+      previousActiveElementRef.current = previouslyFocused
+    } else {
+      previousActiveElementRef.current = null
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const focusableSelector =
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+    const focusTimer = window.setTimeout(() => {
+      const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(focusableSelector)
+      if (firstFocusable) {
+        firstFocusable.focus()
+      } else {
+        dialogRef.current?.focus()
+      }
+    }, 0)
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSaving) {
+        event.preventDefault()
+        closeModal()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector)
+      if (!focusableElements || focusableElements.length === 0) {
+        event.preventDefault()
+        dialogRef.current?.focus()
+        return
+      }
+
+      const firstElement = focusableElements[0]
+      const lastElement = focusableElements[focusableElements.length - 1]
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+
+      if (event.shiftKey) {
+        if (activeElement === firstElement || !dialogRef.current?.contains(activeElement)) {
+          event.preventDefault()
+          lastElement.focus()
+        }
+        return
+      }
+
+      if (activeElement === lastElement) {
+        event.preventDefault()
+        firstElement.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.clearTimeout(focusTimer)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      previousActiveElementRef.current?.focus()
+    }
+  }, [closeModal, isOpen, isSaving])
+
+  const selectedProject = useMemo(() => taskProjects.find((project) => project.id === projectId) ?? taskProjects[0] ?? null, [projectId, taskProjects])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -84,6 +143,11 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
         const project = await createProject({
           name: name.trim(),
           description: description.trim() || undefined,
+        })
+        onProjectCreated?.({
+          id: project.id,
+          name: project.name,
+          boardId: project.board?.id ?? null,
         })
 
         closeModal()
@@ -130,24 +194,27 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
         + Create
       </button>
 
-      {isOpen && (
+      {isOpen &&
+        createPortal(
         <div
-          className="fixed inset-0 z-[60] overflow-y-auto bg-black/50 p-4"
+          className="fixed inset-0 z-40 overflow-y-auto bg-black/50 p-4"
           role="presentation"
-          onClick={() => {
-            if (!isSaving) {
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isSaving) {
               closeModal()
             }
           }}
         >
           <div className="flex min-h-full items-center justify-center">
             <div
-              className="w-full max-w-xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+              ref={dialogRef}
+              tabIndex={-1}
+              className="relative z-50 w-full max-w-xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
               role="dialog"
               aria-modal="true"
               aria-labelledby="global-create-title"
               aria-describedby="global-create-description"
-              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
             >
               <header className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
                 <div>
@@ -311,7 +378,8 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
               </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

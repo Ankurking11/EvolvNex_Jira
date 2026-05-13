@@ -36,7 +36,16 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
   const searchParams = useSearchParams()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [createdProjects, setCreatedProjects] = useState<AppShellProps['projects']>([])
   const currentView = searchParams.get('view') ?? 'dashboard'
+
+  const quickCreateProjects = useMemo(() => {
+    const projectMap = new Map(projects.map((project) => [project.id, project]))
+    createdProjects.forEach((project) => {
+      projectMap.set(project.id, project)
+    })
+    return Array.from(projectMap.values())
+  }, [createdProjects, projects])
 
   const breadcrumbs = useMemo(() => {
     const segments = pathname.split('/').filter(Boolean)
@@ -47,9 +56,9 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
   }, [currentView, pathname])
 
   return (
-    <div className="flex h-screen bg-[#f5f7fb] text-gray-900">
+    <div className="relative z-0 flex h-screen bg-[#f5f7fb] text-gray-900">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-200 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-20 flex w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-200 lg:static lg:translate-x-0 ${
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } ${sidebarOpen ? 'lg:w-64' : 'lg:w-16'}`}
       >
@@ -136,7 +145,15 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
               />
             </div>
 
-            <GlobalCreateButton projects={projects} users={users} />
+            <GlobalCreateButton
+              projects={quickCreateProjects}
+              users={users}
+              onProjectCreated={(project) => {
+                setCreatedProjects((previous) =>
+                  previous.some((existingProject) => existingProject.id === project.id) ? previous : [...previous, project]
+                )
+              }}
+            />
             <button className="rounded p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Notifications">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
