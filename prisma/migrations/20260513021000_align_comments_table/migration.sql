@@ -78,6 +78,15 @@ BEGIN
     FROM pg_constraint
     WHERE conname = 'comments_author_id_fkey'
   ) THEN
+    UPDATE "comments" AS c
+    SET "author_id" = NULL
+    WHERE "author_id" IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM "users" AS u
+        WHERE u."id" = c."author_id"
+      );
+
     ALTER TABLE "comments"
     ADD CONSTRAINT "comments_author_id_fkey"
     FOREIGN KEY ("author_id") REFERENCES "users"("id")
