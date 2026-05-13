@@ -127,19 +127,16 @@ export async function getBoardData(projectId: string) {
 }
 
 export async function getProjects() {
-  console.log('[DEBUG] getProjects called')
   const fetchProjects = async () => {
-    console.log('[DEBUG] fetchProjects starting')
     const commentsAvailable = await hasCommentsTable()
-    console.log('[DEBUG] commentsAvailable:', commentsAvailable)
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        members: {
-          // include: {
-          //   user: true,
-          // },
-        },
+        // members: {
+        //   // include: {
+        //   //   user: true,
+        //   // },
+        // },
         board: {
           include: {
             _count: {
@@ -171,7 +168,6 @@ export async function getProjects() {
         },
       },
     })
-    console.log('[DEBUG] prisma.project.findMany returned:', projects.length, 'projects')
 
     // Always add _count to tasks for consistent typing
     const transformed = projects.map((project) => ({
@@ -186,15 +182,11 @@ export async function getProjects() {
           }
         : project.board,
     }))
-    console.log('[DEBUG] returning transformed projects:', transformed.length)
     return transformed
   }
 
   try {
-    // const result = await unstable_cache(fetchProjects, ['projects'])()
-    const result = await fetchProjects()
-    console.log('[DEBUG] getProjects returning:', result.length, 'projects')
-    return result
+    return await unstable_cache(fetchProjects, ['projects'], { revalidate: 30 })()
   } catch (error) {
     console.error('[getProjects] Failed to fetch projects', error)
     return []
