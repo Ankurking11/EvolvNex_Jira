@@ -177,28 +177,21 @@ export async function getProjects() {
     })
     console.log('[DEBUG] prisma.project.findMany returned:', projects.length, 'projects')
 
-    // if (commentsAvailable) {
-    //   console.log('[DEBUG] returning projects with comments')
-    //   return projects
-    // }
-
-    // const transformed = projects.map((project) => ({
-    //   ...project,
-    //   board: project.board
-    //     ? {
-    //         ...project.board,
-    //         tasks: project.board.tasks.map((task) => ({
-    //           ...task,
-    //           _count: {
-    //             comments: 0,
-    //           },
-    //         })),
-    //       }
-    //     : project.board,
-    // }))
-    // console.log('[DEBUG] returning transformed projects:', transformed.length)
-    // return transformed
-    return projects
+    // Always add _count to tasks for consistent typing
+    const transformed = projects.map((project) => ({
+      ...project,
+      board: project.board
+        ? {
+            ...project.board,
+            tasks: project.board.tasks.map((task) => ({
+              ...task,
+              _count: task._count || { comments: 0 },
+            })),
+          }
+        : project.board,
+    }))
+    console.log('[DEBUG] returning transformed projects:', transformed.length)
+    return transformed
   }
 
   try {
