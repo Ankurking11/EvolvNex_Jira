@@ -136,9 +136,9 @@ export async function getProjects() {
       orderBy: { createdAt: 'desc' },
       include: {
         members: {
-          include: {
-            user: true,
-          },
+          // include: {
+          //   user: true,
+          // },
         },
         board: {
           include: {
