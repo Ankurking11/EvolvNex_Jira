@@ -16,6 +16,10 @@ function getInitials(name: string) {
     .slice(0, 2)
 }
 
+function getAuthorName(comment: BoardComment) {
+  return comment.author?.name ?? 'Unknown user'
+}
+
 function getRelativeTime(dateValue: string | Date) {
   const date = new Date(dateValue)
   const elapsedMinutes = Math.round((Date.now() - date.getTime()) / 60000)
@@ -238,10 +242,10 @@ export default function TaskComments({ taskId, users, defaultAuthorId }: TaskCom
             <article key={comment.id} className="rounded-md border border-gray-200 bg-white px-3 py-3">
               <div className="mb-2 flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-[10px] font-semibold text-white">
-                  {getInitials(comment.author.name)}
+                  {getInitials(getAuthorName(comment))}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-gray-800">{comment.author.name}</p>
+                  <p className="truncate text-xs font-semibold text-gray-800">{getAuthorName(comment)}</p>
                   <p className="text-[11px] text-gray-500">{getRelativeTime(comment.createdAt)}</p>
                 </div>
               </div>

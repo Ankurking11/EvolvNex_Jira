@@ -23,10 +23,9 @@ export type BoardComment = {
   id: string
   content: string
   taskId: string
-  authorId: string
-  author: BoardUser
+  authorId: string | null
+  author: BoardUser | null
   createdAt: string | Date
-  updatedAt: string | Date
 }
 
 export type BoardData = {

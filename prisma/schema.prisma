@@ -77,11 +77,10 @@ model Comment {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   content   String
   taskId    String   @db.Uuid @map("task_id")
-  authorId  String   @db.Uuid @map("author_id")
+  authorId  String?  @db.Uuid @map("author_id")
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User?    @relation(fields: [authorId], references: [id])
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("comments")
 }
