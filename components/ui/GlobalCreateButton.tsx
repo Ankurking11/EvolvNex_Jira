@@ -15,7 +15,6 @@ interface QuickCreateProject {
 interface GlobalCreateButtonProps {
   projects: QuickCreateProject[]
   users: BoardUser[]
-  onProjectCreated?: (project: QuickCreateProject) => void
 }
 
 type CreateMode = 'project' | 'task'
@@ -31,7 +30,7 @@ function getDefaultTaskProjectId(projects: QuickCreateProject[], currentProjectI
   return projects[0]?.id ?? ''
 }
 
-export default function GlobalCreateButton({ projects, users, onProjectCreated }: GlobalCreateButtonProps) {
+export default function GlobalCreateButton({ projects, users }: GlobalCreateButtonProps) {
   const taskProjects = useMemo(() => projects.filter((project) => project.boardId), [projects])
   const [isOpen, setIsOpen] = useState(false)
   const [mode, setMode] = useState<CreateMode>('task')
@@ -143,11 +142,6 @@ export default function GlobalCreateButton({ projects, users, onProjectCreated }
         const project = await createProject({
           name: name.trim(),
           description: description.trim() || undefined,
-        })
-        onProjectCreated?.({
-          id: project.id,
-          name: project.name,
-          boardId: project.board?.id ?? null,
         })
 
         closeModal()

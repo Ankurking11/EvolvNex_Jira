@@ -3,6 +3,7 @@
 import { prisma } from './prisma'
 import { revalidatePath, unstable_cache, revalidateTag } from 'next/cache'
 import { BoardComment, BoardTask, BoardUser } from './board-types'
+import { Prisma } from '@prisma/client'
 
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE'
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
@@ -68,6 +69,36 @@ async function hasCommentsTable() {
   }
 }
 
+async function hasProjectMembersTable() {
+  try {
+    const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT to_regclass('public.project_members') IS NOT NULL AS "exists"
+    `
+
+    return result[0]?.exists ?? false
+  } catch (error) {
+    console.warn('[hasProjectMembersTable] Failed to inspect project_members table availability', error)
+    return false
+  }
+}
+
+function isMissingProjectMembersTableError(error: unknown) {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2021' &&
+    typeof error.meta?.table === 'string' &&
+    error.meta.table.includes('project_members')
+  ) {
+    return true
+  }
+
+  if (error instanceof Error) {
+    return error.message.includes('public.project_members') || error.message.includes('project_members')
+  }
+
+  return false
+}
+
 /**
  * Keeps dashboard aggregate cards and the project board page in sync after task mutations.
  */
@@ -79,23 +110,26 @@ function revalidateProjectAndDashboard(projectId: string) {
 export async function getBoardData(projectId: string) {
   try {
     const commentsAvailable = await hasCommentsTable()
+    const projectMembersAvailable = await hasProjectMembersTable()
     const board = await prisma.board.findFirst({
       where: { projectId },
       include: {
-        project: {
-          include: {
-            members: {
+        project: projectMembersAvailable
+          ? {
               include: {
-                user: true,
-              },
-              orderBy: {
-                user: {
-                  name: 'asc',
+                members: {
+                  include: {
+                    user: true,
+                  },
+                  orderBy: {
+                    user: {
+                      name: 'asc',
+                    },
+                  },
                 },
               },
-            },
-          },
-        },
+            }
+          : true,
         tasks: {
           include: {
             assignee: true,
@@ -118,7 +152,9 @@ export async function getBoardData(projectId: string) {
     return {
       id: board.id,
       tasks: board.tasks.map(serializeTask),
-      members: board.project.members.map((member) => member.user),
+      members: projectMembersAvailable
+        ? ((board.project as { members?: Array<{ user: BoardUser }> }).members ?? []).map((member) => member.user)
+        : [],
     }
   } catch (error) {
     console.error('[getBoardData] Failed to fetch board for project', projectId, error)
@@ -129,14 +165,19 @@ export async function getBoardData(projectId: string) {
 export async function getProjects() {
   const fetchProjects = async () => {
     const commentsAvailable = await hasCommentsTable()
+    const projectMembersAvailable = await hasProjectMembersTable()
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        members: {
-          include: {
-            user: true,
-          },
-        },
+        ...(projectMembersAvailable
+          ? {
+              members: {
+                include: {
+                  user: true,
+                },
+              },
+            }
+          : {}),
         board: {
           include: {
             _count: {
@@ -157,11 +198,15 @@ export async function getProjects() {
                     email: true,
                   },
                 },
-                _count: {
-                  select: {
-                    comments: true,
-                  },
-                },
+                ...(commentsAvailable
+                  ? {
+                      _count: {
+                        select: {
+                          comments: true,
+                        },
+                      },
+                    }
+                  : {}),
               },
             },
           },
@@ -172,12 +217,15 @@ export async function getProjects() {
     // Always add _count to tasks for consistent typing
     const transformed = projects.map((project) => ({
       ...project,
+      members: projectMembersAvailable ? (project as { members?: unknown[] }).members ?? [] : [],
       board: project.board
         ? {
             ...project.board,
             tasks: project.board.tasks.map((task) => ({
               ...task,
-              // _count already included in select
+              _count: {
+                comments: (task as { _count?: { comments?: number } })._count?.comments ?? 0,
+              },
             })),
           }
         : project.board,
@@ -186,7 +234,10 @@ export async function getProjects() {
   }
 
   try {
-    return await unstable_cache(fetchProjects, ['projects'], { revalidate: 30 })()
+    return await unstable_cache(fetchProjects, ['projects'], {
+      revalidate: 30,
+      tags: ['projects'],
+    })()
   } catch (error) {
     console.error('[getProjects] Failed to fetch projects with members, trying without members', error)
     // Fallback: fetch without members relation
@@ -207,21 +258,16 @@ export async function getProjects() {
                   priority: true,
                   updatedAt: true,
                   assigneeId: true,
-                  assignee: {
-                    select: {
-                      id: true,
+                assignee: {
+                  select: {
+                    id: true,
                       name: true,
-                      email: true,
-                    },
-                  },
-                  _count: {
-                    select: {
-                      comments: true,
-                    },
+                    email: true,
                   },
                 },
               },
             },
+          },
           },
         },
       })
@@ -257,23 +303,34 @@ export async function getUsers() {
 }
 
 async function ensureProjectMember(projectId: string, userId: string) {
-  await prisma.projectMember.upsert({
-    where: {
-      projectId_userId: {
+  try {
+    await prisma.projectMember.upsert({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId,
+        },
+      },
+      update: {},
+      create: {
         projectId,
         userId,
       },
-    },
-    update: {},
-    create: {
-      projectId,
-      userId,
-    },
-  })
+    })
+  } catch (error) {
+    if (isMissingProjectMembersTableError(error)) {
+      console.warn('[ensureProjectMember] project_members table is unavailable; skipping member sync')
+      return
+    }
+    throw error
+  }
 }
 
 export async function updateProjectMembers(projectId: string, userIds: string[]) {
   const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)))
+  if (!(await hasProjectMembersTable())) {
+    return []
+  }
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -407,35 +464,59 @@ export async function createTask(data: {
 }) {
   try {
     const commentsAvailable = await hasCommentsTable()
-    const task = await prisma.task.create({
-      data: {
-        title: data.title,
-        description: data.description,
-        status: data.status,
-        priority: data.priority,
-        assigneeId: data.assigneeId,
-        boardId: data.boardId,
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
-      },
-      include: {
-        assignee: true,
-        board: {
-          select: { projectId: true },
+    const task = await prisma.$transaction(async (tx) => {
+      const createdTask = await tx.task.create({
+        data: {
+          title: data.title,
+          description: data.description,
+          status: data.status,
+          priority: data.priority,
+          assigneeId: data.assigneeId,
+          boardId: data.boardId,
+          dueDate: data.dueDate ? new Date(data.dueDate) : null,
         },
-        ...(commentsAvailable
-          ? {
-              _count: {
-                select: {
-                  comments: true,
+        include: {
+          assignee: true,
+          board: {
+            select: { projectId: true },
+          },
+          ...(commentsAvailable
+            ? {
+                _count: {
+                  select: {
+                    comments: true,
+                  },
                 },
+              }
+            : {}),
+        },
+      })
+
+      if (data.assigneeId) {
+        try {
+          await tx.projectMember.upsert({
+            where: {
+              projectId_userId: {
+                projectId: createdTask.board.projectId,
+                userId: data.assigneeId,
               },
-            }
-          : {}),
-      },
+            },
+            update: {},
+            create: {
+              projectId: createdTask.board.projectId,
+              userId: data.assigneeId,
+            },
+          })
+        } catch (error) {
+          if (!isMissingProjectMembersTableError(error)) {
+            throw error
+          }
+        }
+      }
+
+      return createdTask
     })
-    if (data.assigneeId) {
-      await ensureProjectMember(task.board.projectId, data.assigneeId)
-    }
+
     revalidateTag('projects', {})
     revalidateProjectAndDashboard(task.board.projectId)
     return serializeTask(task)

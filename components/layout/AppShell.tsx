@@ -36,16 +36,7 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
   const searchParams = useSearchParams()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [createdProjects, setCreatedProjects] = useState<AppShellProps['projects']>([])
   const currentView = searchParams.get('view') ?? 'dashboard'
-
-  const quickCreateProjects = useMemo(() => {
-    const projectMap = new Map(projects.map((project) => [project.id, project]))
-    createdProjects.forEach((project) => {
-      projectMap.set(project.id, project)
-    })
-    return Array.from(projectMap.values())
-  }, [createdProjects, projects])
 
   const breadcrumbs = useMemo(() => {
     const segments = pathname.split('/').filter(Boolean)
@@ -146,13 +137,8 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
             </div>
 
             <GlobalCreateButton
-              projects={quickCreateProjects}
+              projects={projects}
               users={users}
-              onProjectCreated={(project) => {
-                setCreatedProjects((previous) =>
-                  previous.some((existingProject) => existingProject.id === project.id) ? previous : [...previous, project]
-                )
-              }}
             />
             <button className="rounded p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Notifications">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -35,6 +35,9 @@ export default async function DashboardPage({
   const allTasks = projects.flatMap((project) =>
     (project.board?.tasks ?? []).map((task) => ({
       ...task,
+      _count: {
+        comments: (task as { _count?: { comments?: number } })._count?.comments ?? 0,
+      },
       projectId: project.id,
       projectName: project.name,
       projectDescription: project.description,
@@ -260,7 +263,7 @@ export default async function DashboardPage({
                     <div className="space-y-2 text-sm text-gray-600">
                       <div className="flex items-center justify-between"><span>Total tasks</span><span className="font-semibold text-gray-900">{projectTasks.length}</span></div>
                       <div className="flex items-center justify-between"><span>Done</span><span className="font-semibold text-gray-900">{completedCount}</span></div>
-                      <div className="flex items-center justify-between"><span>Open comments</span><span className="font-semibold text-gray-900">{projectTasks.reduce((sum, task) => sum + task._count.comments, 0)}</span></div>
+                      <div className="flex items-center justify-between"><span>Open comments</span><span className="font-semibold text-gray-900">{projectTasks.reduce((sum, task) => sum + ((task as { _count?: { comments?: number } })._count?.comments ?? 0), 0)}</span></div>
                     </div>
                   </div>
                 )
@@ -282,7 +285,7 @@ export default async function DashboardPage({
               <div className="space-y-3">
                 {users.map((user) => {
                   const assignedCount = allTasks.filter((task) => task.assigneeId === user.id).length
-                  const memberProjects = projects.filter((project) => project.members.some((member) => member.userId === user.id)).length
+                  const memberProjects = projects.filter((project) => project.members.some((member) => (member as { userId?: string }).userId === user.id)).length
 
                   return (
                     <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3">
