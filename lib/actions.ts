@@ -127,74 +127,85 @@ export async function getBoardData(projectId: string) {
 }
 
 export async function getProjects() {
+  console.log('[DEBUG] getProjects called')
   const fetchProjects = async () => {
+    console.log('[DEBUG] fetchProjects starting')
     const commentsAvailable = await hasCommentsTable()
+    console.log('[DEBUG] commentsAvailable:', commentsAvailable)
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
-      include: {
-        members: {
-          include: {
-            user: true,
-          },
-        },
-        board: {
-          include: {
-            _count: {
-              select: { tasks: true },
-            },
-            tasks: {
-              select: {
-                id: true,
-                title: true,
-                status: true,
-                priority: true,
-                updatedAt: true,
-                assigneeId: true,
-                assignee: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                  },
-                },
-                ...(commentsAvailable
-                  ? {
-                      _count: {
-                        select: {
-                          comments: true,
-                        },
-                      },
-                    }
-                  : {}),
-              },
-            },
-          },
-        },
-      },
+      // include: {
+      //   // members: {
+      //   //   include: {
+      //   //     user: true,
+      //   //   },
+      //   // },
+      //   board: {
+      //     include: {
+      //       _count: {
+      //         select: { tasks: true },
+      //       },
+      //       tasks: {
+      //         select: {
+      //           id: true,
+      //           title: true,
+      //           status: true,
+      //           priority: true,
+      //           updatedAt: true,
+      //           assigneeId: true,
+      //           assignee: {
+      //             select: {
+      //               id: true,
+      //               name: true,
+      //               email: true,
+      //             },
+      //           },
+      //           // ...(commentsAvailable
+      //           //   ? {
+      //           //       _count: {
+      //           //         select: {
+      //           //           comments: true,
+      //           //         },
+      //           //       },
+      //           //     }
+      //           //   : {}),
+      //         },
+      //       },
+      //     },
+      //   },
+      // },
     })
+    console.log('[DEBUG] prisma.project.findMany returned:', projects.length, 'projects')
 
-    if (commentsAvailable) {
-      return projects
-    }
+    // if (commentsAvailable) {
+    //   console.log('[DEBUG] returning projects with comments')
+    //   return projects
+    // }
 
-    return projects.map((project) => ({
-      ...project,
-      board: project.board
-        ? {
-            ...project.board,
-            tasks: project.board.tasks.map((task) => ({
-              ...task,
-              _count: {
-                comments: 0,
-              },
-            })),
-          }
-        : project.board,
-    }))
+    // const transformed = projects.map((project) => ({
+    //   ...project,
+    //   board: project.board
+    //     ? {
+    //         ...project.board,
+    //         tasks: project.board.tasks.map((task) => ({
+    //           ...task,
+    //           _count: {
+    //             comments: 0,
+    //           },
+    //         })),
+    //       }
+    //     : project.board,
+    // }))
+    // console.log('[DEBUG] returning transformed projects:', transformed.length)
+    // return transformed
+    return projects
   }
 
   try {
-    return await unstable_cache(fetchProjects, ['projects'])()
+    // const result = await unstable_cache(fetchProjects, ['projects'])()
+    const result = await fetchProjects()
+    console.log('[DEBUG] getProjects returning:', result.length, 'projects')
+    return result
   } catch (error) {
     console.error('[getProjects] Failed to fetch projects', error)
     return []
