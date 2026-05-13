@@ -48,20 +48,18 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, isSaving])
 
-  const selectedProject = useMemo(() => taskProjects.find((project) => project.id === projectId) ?? null, [projectId, taskProjects])
-
-  useEffect(() => {
-    if (mode !== 'task') return
-
-    if (!selectedProject && taskProjects.length > 0) {
-      setProjectId(taskProjects[0].id)
-      return
+  const resolvedProjectId = useMemo(() => {
+    if (taskProjects.some((project) => project.id === projectId)) {
+      return projectId
     }
 
-    if (taskProjects.length === 0 && projectId) {
-      setProjectId('')
-    }
-  }, [mode, projectId, selectedProject, taskProjects])
+    return taskProjects[0]?.id ?? ''
+  }, [projectId, taskProjects])
+
+  const selectedProject = useMemo(
+    () => taskProjects.find((project) => project.id === resolvedProjectId) ?? null,
+    [resolvedProjectId, taskProjects]
+  )
 
   const resetState = () => {
     setName('')
@@ -216,7 +214,7 @@ export default function GlobalCreateButton({ projects, users }: GlobalCreateButt
                       <div className="space-y-3">
                         <div>
                           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">Project</label>
-                          <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className={INPUT_CLASS}>
+                          <select value={resolvedProjectId} onChange={(event) => setProjectId(event.target.value)} className={INPUT_CLASS}>
                             {taskProjects.map((project) => (
                               <option key={project.id} value={project.id}>
                                 {project.name}
