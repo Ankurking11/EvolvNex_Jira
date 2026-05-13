@@ -127,15 +127,18 @@ export async function getBoardData(projectId: string) {
 }
 
 export async function getProjects() {
+  console.log('[DEBUG] getProjects called')
   const fetchProjects = async () => {
+    console.log('[DEBUG] fetchProjects starting')
     const commentsAvailable = await hasCommentsTable()
+    console.log('[DEBUG] commentsAvailable:', commentsAvailable)
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         members: {
-          include: {
-            user: true,
-          },
+          // include: {
+          //   user: true,
+          // },
         },
         board: {
           include: {
@@ -157,44 +160,41 @@ export async function getProjects() {
                     email: true,
                   },
                 },
-                ...(commentsAvailable
-                  ? {
-                      _count: {
-                        select: {
-                          comments: true,
-                        },
-                      },
-                    }
-                  : {}),
+                _count: {
+                  select: {
+                    comments: true,
+                  },
+                },
               },
             },
           },
         },
       },
     })
+    console.log('[DEBUG] prisma.project.findMany returned:', projects.length, 'projects')
 
-    if (commentsAvailable) {
-      return projects
-    }
-
-    return projects.map((project) => ({
+    // Always add _count to tasks for consistent typing
+    const transformed = projects.map((project) => ({
       ...project,
       board: project.board
         ? {
             ...project.board,
             tasks: project.board.tasks.map((task) => ({
               ...task,
-              _count: {
-                comments: 0,
-              },
+              // _count already included in select
             })),
           }
         : project.board,
     }))
+    console.log('[DEBUG] returning transformed projects:', transformed.length)
+    return transformed
   }
 
   try {
-    return await unstable_cache(fetchProjects, ['projects'])()
+    // const result = await unstable_cache(fetchProjects, ['projects'])()
+    const result = await fetchProjects()
+    console.log('[DEBUG] getProjects returning:', result.length, 'projects')
+    return result
   } catch (error) {
     console.error('[getProjects] Failed to fetch projects', error)
     return []
