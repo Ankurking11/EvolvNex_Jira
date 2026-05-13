@@ -390,7 +390,7 @@ export async function createTask(data: {
     if (data.assigneeId) {
       await ensureProjectMember(task.board.projectId, data.assigneeId)
     }
-    revalidateTag('projects')
+    revalidateTag('projects', {})
     revalidateProjectAndDashboard(task.board.projectId)
     return serializeTask(task)
   } catch (error) {
@@ -443,7 +443,7 @@ export async function updateTask(
     if (task.assigneeId) {
       await ensureProjectMember(task.board.projectId, task.assigneeId)
     }
-    revalidateTag('projects')
+    revalidateTag('projects', {})
     revalidateProjectAndDashboard(task.board.projectId)
     return serializeTask(task)
   } catch (error) {
@@ -515,7 +515,7 @@ export async function createProject(data: { name: string; description?: string }
         },
       },
     })
-    revalidateTag('projects')
+    revalidateTag('projects', {})
     revalidateProjectAndDashboard(project.id)
     return project
   } catch (error) {
@@ -530,7 +530,7 @@ export async function updateProject(projectId: string, data: { name?: string; de
       where: { id: projectId },
       data,
     })
-    revalidateTag('projects')
+    revalidateTag('projects', {})
     revalidateProjectAndDashboard(projectId)
     return project
   } catch (error) {
@@ -544,7 +544,7 @@ export async function deleteProject(projectId: string) {
     await prisma.project.delete({
       where: { id: projectId },
     })
-    revalidateTag('projects')
+    revalidateTag('projects', {})
     revalidatePath('/dashboard')
   } catch (error) {
     console.error('[deleteProject] Failed to delete project', { projectId }, error)
