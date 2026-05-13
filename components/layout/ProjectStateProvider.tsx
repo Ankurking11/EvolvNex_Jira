@@ -48,6 +48,7 @@ export function ProjectStateProvider({
     return [...optimisticOnlyProjects, ...initialProjects]
   }, [initialProjects, optimisticProjects])
   const previousProjectsSignatureRef = useRef(getProjectSignature(projects))
+  const previousProjectsSnapshotRef = useRef(getProjectSnapshot(projects))
 
   useEffect(() => {
     console.debug('[ProjectStateProvider] AppShell hydration', getProjectSnapshot(initialProjects))
@@ -60,11 +61,11 @@ export function ProjectStateProvider({
     if (previousProjectsSignature !== nextProjectsSignature) {
       console.debug('[ProjectStateProvider] Project list state updated', {
         reason: 'derived-sync',
-        beforeSignature: previousProjectsSignature,
-        afterSignature: nextProjectsSignature,
-        snapshot: getProjectSnapshot(projects),
+        before: previousProjectsSnapshotRef.current,
+        after: getProjectSnapshot(projects),
       })
       previousProjectsSignatureRef.current = nextProjectsSignature
+      previousProjectsSnapshotRef.current = getProjectSnapshot(projects)
     }
   }, [projects])
 
