@@ -64,11 +64,7 @@ export default function TaskComments({ taskId, users, defaultAuthorId }: TaskCom
     ''
 
   const refreshComments = useCallback(
-    async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
-      if (showLoading) {
-        setIsLoading(true)
-      }
-
+    async () => {
       if (refreshInFlightRef.current) {
         queuedRefreshRef.current = true
         return
@@ -115,8 +111,8 @@ export default function TaskComments({ taskId, users, defaultAuthorId }: TaskCom
 
   useEffect(() => {
     queuedRefreshRef.current = false
-    void refreshComments({ showLoading: true })
-  }, [refreshComments, taskId])
+    void refreshComments()
+  }, [refreshComments])
 
   useEffect(
     () => () => {
