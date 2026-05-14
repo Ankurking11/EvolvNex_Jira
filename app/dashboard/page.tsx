@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { getProjects, getUsers } from '@/lib/actions'
-import ProjectCard from '@/components/ui/ProjectCard'
+import ProjectsSection from '@/components/ui/ProjectsSection'
 import CreateProjectButton from '@/components/ui/CreateProjectButton'
 import UserManagementPanel from '@/components/settings/UserManagementPanel'
 
@@ -119,29 +119,7 @@ export default async function DashboardPage({
       {(view === 'dashboard' || view === 'projects') && (
         <>
           {summarySection}
-          <section className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-900">Projects</h2>
-              <p className="text-xs text-gray-500">
-                {projects.length} {projects.length === 1 ? 'project' : 'projects'}
-              </p>
-            </div>
-
-            {projects.length === 0 ? (
-              <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-center">
-                <div>
-                  <h3 className="text-base font-semibold text-gray-800">No projects yet</h3>
-                  <p className="mt-1 text-sm text-gray-500">Create your first project to start planning work.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {projects.map((project) => (
-                  <ProjectCard key={project.id} project={project} />
-                ))}
-              </div>
-            )}
-          </section>
+          <ProjectsSection projects={projects} />
         </>
       )}
 
