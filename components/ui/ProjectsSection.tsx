@@ -69,9 +69,9 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
       results.forEach((result, index) => {
         if (result.status === 'fulfilled') {
           deletedProjectIds.push(result.value)
-          return
+        } else {
+          failedProjectIds.push(idsToDelete[index])
         }
-        failedProjectIds.push(idsToDelete[index])
       })
 
       if (deletedProjectIds.length > 0) {
@@ -86,6 +86,7 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
         setSelectedProjectIds((current) => current.filter((id) => failedIdSet.has(id)))
         window.alert(`Failed to delete: ${failedNames.join(', ')}`)
       } else {
+        setIsSelectionMode(false)
         setSelectedProjectIds([])
       }
     } catch (error) {
