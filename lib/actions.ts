@@ -304,6 +304,97 @@ export async function getUsers() {
   }
 }
 
+export async function createUser(data: { name: string; email: string; role?: string }) {
+  const name = data.name.trim()
+  const email = data.email.trim().toLowerCase()
+  const normalizedRole = (data.role?.trim().toUpperCase() || 'MEMBER') as 'MEMBER' | 'ADMIN'
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+  if (!name) {
+    throw new Error('Name is required')
+  }
+
+  if (!email) {
+    throw new Error('Email is required')
+  }
+
+  if (!emailPattern.test(email)) {
+    throw new Error('Please enter a valid email address')
+  }
+
+  if (normalizedRole !== 'MEMBER' && normalizedRole !== 'ADMIN') {
+    throw new Error('Invalid role')
+  }
+
+  try {
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        role: normalizedRole,
+      },
+    })
+
+    revalidateTag('projects', 'max')
+    revalidatePath('/dashboard')
+    revalidatePath('/', 'layout')
+
+    return user
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new Error('A user with this email already exists')
+    }
+    console.error('[createUser] Failed to create user', { email }, error)
+    throw error
+  }
+}
+
+export async function deleteUser(userId: string) {
+  const id = userId.trim()
+  if (!id) {
+    throw new Error('User id is required')
+  }
+
+  const commentsAvailable = await hasCommentsTable()
+  const projectMembersAvailable = await hasProjectMembersTable()
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.task.updateMany({
+        where: { assigneeId: id },
+        data: { assigneeId: null },
+      })
+
+      if (commentsAvailable) {
+        await tx.comment.updateMany({
+          where: { authorId: id },
+          data: { authorId: null },
+        })
+      }
+
+      if (projectMembersAvailable) {
+        await tx.projectMember.deleteMany({
+          where: { userId: id },
+        })
+      }
+
+      await tx.user.delete({
+        where: { id },
+      })
+    })
+
+    revalidateTag('projects', 'max')
+    revalidatePath('/dashboard')
+    revalidatePath('/', 'layout')
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      throw new Error('User not found')
+    }
+    console.error('[deleteUser] Failed to delete user', { userId: id }, error)
+    throw error
+  }
+}
+
 async function ensureProjectMember(projectId: string, userId: string) {
   try {
     await prisma.projectMember.upsert({
