@@ -308,6 +308,7 @@ export async function createUser(data: { name: string; email: string; role?: str
   const name = data.name.trim()
   const email = data.email.trim().toLowerCase()
   const normalizedRole = (data.role?.trim().toUpperCase() || 'MEMBER') as 'MEMBER' | 'ADMIN'
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
   if (!name) {
     throw new Error('Name is required')
@@ -317,7 +318,7 @@ export async function createUser(data: { name: string; email: string; role?: str
     throw new Error('Email is required')
   }
 
-  if (!email.includes('@')) {
+  if (!emailPattern.test(email)) {
     throw new Error('Please enter a valid email address')
   }
 
