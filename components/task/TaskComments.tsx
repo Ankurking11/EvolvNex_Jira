@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BoardComment, BoardUser } from '@/lib/board-types'
 import { createTaskComment } from '@/lib/actions'
 import { getSupabaseBrowserClient } from '@/lib/supabase'
@@ -52,6 +52,9 @@ export default function TaskComments({ taskId, users, defaultAuthorId }: TaskCom
   const [error, setError] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [isRealtimeHealthy, setIsRealtimeHealthy] = useState(false)
+  const refreshInFlightRef = useRef(false)
+  const queuedRefreshRef = useRef(false)
+  const isMountedRef = useRef(true)
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
 
   const selectedAuthorId =
@@ -60,63 +63,63 @@ export default function TaskComments({ taskId, users, defaultAuthorId }: TaskCom
     users[0]?.id ??
     ''
 
-  const refreshComments = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/tasks/${taskId}/comments`, {
-        headers: { 'cache-control': 'no-cache' },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to load comments (${response.status})`)
+  const refreshComments = useCallback(
+    async () => {
+      if (refreshInFlightRef.current) {
+        queuedRefreshRef.current = true
+        return
       }
 
-      const nextComments = (await response.json()) as BoardComment[]
-      setComments(nextComments)
-      setSyncError(null)
-    } catch (refreshError) {
-      console.warn('[TaskComments] Failed to refresh comments', refreshError)
-      setSyncError('Comment sync is delayed. Retrying automatically.')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [taskId])
+      refreshInFlightRef.current = true
 
-  useEffect(() => {
-    let cancelled = false
-
-    const loadComments = async () => {
       try {
-        const response = await fetch(`/api/tasks/${taskId}/comments`, {
-          headers: { 'cache-control': 'no-cache' },
-        })
+        do {
+          queuedRefreshRef.current = false
 
-        if (!response.ok) {
-          throw new Error(`Failed to load comments (${response.status})`)
-        }
+          try {
+            const response = await fetch(`/api/tasks/${taskId}/comments`, {
+              headers: { 'cache-control': 'no-cache' },
+            })
 
-        const nextComments = (await response.json()) as BoardComment[]
-        if (!cancelled) {
-          setComments(nextComments)
-          setSyncError(null)
-        }
-      } catch (loadError) {
-        console.warn('[TaskComments] Failed to load comments', loadError)
-        if (!cancelled) {
-          setSyncError('Comment sync is delayed. Retrying automatically.')
-        }
+            if (!response.ok) {
+              throw new Error(`Failed to load comments (${response.status})`)
+            }
+
+            const nextComments = (await response.json()) as BoardComment[]
+            if (!isMountedRef.current) {
+              return
+            }
+            setComments(nextComments)
+            setSyncError(null)
+          } catch (refreshError) {
+            if (!isMountedRef.current) {
+              return
+            }
+            console.warn('[TaskComments] Failed to refresh comments', refreshError)
+            setSyncError('Comment sync is delayed. Retrying automatically.')
+          }
+        } while (queuedRefreshRef.current && isMountedRef.current)
       } finally {
-        if (!cancelled) {
+        refreshInFlightRef.current = false
+        if (isMountedRef.current) {
           setIsLoading(false)
         }
       }
-    }
+    },
+    [taskId]
+  )
 
-    void loadComments()
+  useEffect(() => {
+    queuedRefreshRef.current = false
+    void refreshComments()
+  }, [refreshComments])
 
-    return () => {
-      cancelled = true
-    }
-  }, [taskId])
+  useEffect(
+    () => () => {
+      isMountedRef.current = false
+    },
+    []
+  )
 
   useEffect(() => {
     if (supabase && isRealtimeHealthy) return

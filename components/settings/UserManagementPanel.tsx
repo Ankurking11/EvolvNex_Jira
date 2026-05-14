@@ -1,7 +1,6 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createUser, deleteUser } from '@/lib/actions'
 
 interface SettingsUser {
@@ -31,7 +30,6 @@ export default function UserManagementPanel({ users, statsByUser }: UserManageme
   const [isCreating, setIsCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
 
   const handleAddUser = async (event: FormEvent) => {
     event.preventDefault()
@@ -49,7 +47,6 @@ export default function UserManagementPanel({ users, statsByUser }: UserManageme
       setName('')
       setEmail('')
       setRole('MEMBER')
-      router.refresh()
     } catch (createError) {
       console.error('[UserManagementPanel] Failed to create user', createError)
       setError(createError instanceof Error ? createError.message : 'Failed to add user. Please try again.')
@@ -67,7 +64,6 @@ export default function UserManagementPanel({ users, statsByUser }: UserManageme
 
     try {
       await deleteUser(userId)
-      router.refresh()
     } catch (deleteError) {
       console.error('[UserManagementPanel] Failed to delete user', deleteError)
       setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete user. Please try again.')
