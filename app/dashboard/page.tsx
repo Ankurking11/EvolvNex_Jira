@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { getProjects, getUsers } from '@/lib/actions'
 import ProjectCard from '@/components/ui/ProjectCard'
 import CreateProjectButton from '@/components/ui/CreateProjectButton'
+import UserManagementPanel from '@/components/settings/UserManagementPanel'
 
 type DashboardView = 'dashboard' | 'projects' | 'my-tasks' | 'activity' | 'reports' | 'settings'
 
@@ -69,6 +70,15 @@ export default async function DashboardPage({
     tasks: allTasks.filter((task) => task.assigneeId === user.id).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
   }))
   const unassignedTasks = allTasks.filter((task) => !task.assigneeId)
+  const userStats = Object.fromEntries(
+    users.map((user) => [
+      user.id,
+      {
+        assignedCount: allTasks.filter((task) => task.assigneeId === user.id).length,
+        memberProjects: projects.filter((project) => project.members.some((member) => member.userId === user.id)).length,
+      },
+    ])
+  )
 
   const summarySection = (
     <>
@@ -283,31 +293,7 @@ export default async function DashboardPage({
         <>
           {summarySection}
           <section className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-900">Workspace members</h2>
-                <p className="text-xs text-gray-500">{users.length} total users</p>
-              </div>
-              <div className="space-y-3">
-                {users.map((user) => {
-                  const assignedCount = allTasks.filter((task) => task.assigneeId === user.id).length
-                  const memberProjects = projects.filter((project) => project.members.some((member) => member.userId === user.id)).length
-
-                  return (
-                    <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                        <p className="text-xs text-gray-500">{user.email}</p>
-                      </div>
-                      <div className="flex gap-3 text-xs text-gray-500">
-                        <span>{memberProjects} projects</span>
-                        <span>{assignedCount} tasks</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <UserManagementPanel users={users} statsByUser={userStats} />
 
             <div className="space-y-3">
               <div className="rounded-lg border border-gray-200 bg-white p-4">
