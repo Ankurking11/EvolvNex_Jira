@@ -7,6 +7,28 @@ import { Prisma } from '@prisma/client'
 
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE'
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
+const TABLE_AVAILABILITY_TTL_MS = 5000
+
+type TableAvailabilityCacheEntry = {
+  value: boolean
+  expiresAt: number
+}
+
+let commentsTableCache: TableAvailabilityCacheEntry | null = null
+let projectMembersTableCache: TableAvailabilityCacheEntry | null = null
+
+function readTableAvailabilityCache(entry: TableAvailabilityCacheEntry | null) {
+  if (!entry) return null
+  if (Date.now() >= entry.expiresAt) return null
+  return entry.value
+}
+
+function writeTableAvailabilityCache(value: boolean): TableAvailabilityCacheEntry {
+  return {
+    value,
+    expiresAt: Date.now() + TABLE_AVAILABILITY_TTL_MS,
+  }
+}
 
 function serializeTask(task: {
   id: string
@@ -57,27 +79,43 @@ function serializeComment(comment: {
 }
 
 async function hasCommentsTable() {
+  const cached = readTableAvailabilityCache(commentsTableCache)
+  if (cached !== null) {
+    return cached
+  }
+
   try {
     const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
       SELECT to_regclass('public.comments') IS NOT NULL AS "exists"
     `
 
-    return result[0]?.exists ?? false
+    const exists = result[0]?.exists ?? false
+    commentsTableCache = writeTableAvailabilityCache(exists)
+    return exists
   } catch (error) {
     console.warn('[hasCommentsTable] Failed to inspect comments table availability', error)
+    commentsTableCache = writeTableAvailabilityCache(false)
     return false
   }
 }
 
 async function hasProjectMembersTable() {
+  const cached = readTableAvailabilityCache(projectMembersTableCache)
+  if (cached !== null) {
+    return cached
+  }
+
   try {
     const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
       SELECT to_regclass('public.project_members') IS NOT NULL AS "exists"
     `
 
-    return result[0]?.exists ?? false
+    const exists = result[0]?.exists ?? false
+    projectMembersTableCache = writeTableAvailabilityCache(exists)
+    return exists
   } catch (error) {
     console.warn('[hasProjectMembersTable] Failed to inspect project_members table availability', error)
+    projectMembersTableCache = writeTableAvailabilityCache(false)
     return false
   }
 }

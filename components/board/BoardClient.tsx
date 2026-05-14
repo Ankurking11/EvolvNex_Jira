@@ -23,6 +23,7 @@ import ProjectMembersModal from './ProjectMembersModal'
 import ProjectSettingsModal from './ProjectSettingsModal'
 
 const POLLING_INTERVAL_MS = 20000
+const REFRESH_COALESCE_MS = 250
 const TOUCH_ACTIVATION_DELAY_MS = 180
 const TOUCH_ACTIVATION_TOLERANCE_PX = 6
 
@@ -183,6 +184,8 @@ export default function BoardClient({ board, users, projectId, projectName, proj
   const latestRefreshRequest = useRef(0)
   const refreshInFlightRef = useRef(false)
   const hasLoggedPollingErrorRef = useRef(false)
+  const coalescedRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastRefreshTriggerAtRef = useRef(0)
   const moveErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const boardTaskIdsRef = useRef<Set<string>>(new Set(board.tasks.map((task) => task.id)))
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
@@ -232,22 +235,43 @@ export default function BoardClient({ board, users, projectId, projectName, proj
     }
   }, [projectId])
 
+  const triggerRefreshBoard = useCallback(() => {
+    const now = Date.now()
+    const elapsed = now - lastRefreshTriggerAtRef.current
+
+    if (elapsed >= REFRESH_COALESCE_MS) {
+      lastRefreshTriggerAtRef.current = now
+      void refreshBoard()
+      return
+    }
+
+    if (coalescedRefreshTimerRef.current) {
+      return
+    }
+
+    coalescedRefreshTimerRef.current = setTimeout(() => {
+      coalescedRefreshTimerRef.current = null
+      lastRefreshTriggerAtRef.current = Date.now()
+      void refreshBoard()
+    }, REFRESH_COALESCE_MS - elapsed)
+  }, [refreshBoard])
+
   useEffect(() => {
     if (supabase && isRealtimeHealthy) return
 
     const kickoffRefresh = setTimeout(() => {
-      void refreshBoard()
+      triggerRefreshBoard()
     }, 0)
 
     const interval = setInterval(() => {
-      void refreshBoard()
+      triggerRefreshBoard()
     }, POLLING_INTERVAL_MS)
 
     return () => {
       clearTimeout(kickoffRefresh)
       clearInterval(interval)
     }
-  }, [refreshBoard, isRealtimeHealthy, supabase])
+  }, [isRealtimeHealthy, supabase, triggerRefreshBoard])
 
   useEffect(() => {
     if (!supabase) return
@@ -258,7 +282,7 @@ export default function BoardClient({ board, users, projectId, projectName, proj
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks', filter: `board_id=eq.${board.id}` },
         () => {
-          void refreshBoard()
+          triggerRefreshBoard()
         }
       )
       .subscribe((status) => {
@@ -278,7 +302,7 @@ export default function BoardClient({ board, users, projectId, projectName, proj
       setIsRealtimeHealthy(false)
       void supabase.removeChannel(channel)
     }
-  }, [board.id, refreshBoard, supabase])
+  }, [board.id, supabase, triggerRefreshBoard])
 
   useEffect(() => {
     if (!supabase) return
@@ -300,7 +324,7 @@ export default function BoardClient({ board, users, projectId, projectName, proj
           (typeof oldRecord?.task_id === 'string' ? oldRecord.task_id : null)
 
         if (taskId && boardTaskIdsRef.current.has(taskId)) {
-          void refreshBoard()
+          triggerRefreshBoard()
         }
       })
       .subscribe()
@@ -308,12 +332,15 @@ export default function BoardClient({ board, users, projectId, projectName, proj
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [board.id, refreshBoard, supabase])
+  }, [board.id, supabase, triggerRefreshBoard])
 
   useEffect(
     () => () => {
       if (moveErrorTimer.current) {
         clearTimeout(moveErrorTimer.current)
+      }
+      if (coalescedRefreshTimerRef.current) {
+        clearTimeout(coalescedRefreshTimerRef.current)
       }
     },
     []
