@@ -55,11 +55,39 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
 
     try {
       const idsToDelete = [...selectedProjectIds]
-      await Promise.all(idsToDelete.map((projectId) => deleteProject(projectId)))
-      const deletedIdSet = new Set(idsToDelete)
-      setLocalProjects((current) => current.filter((project) => !deletedIdSet.has(project.id)))
-      setSelectedProjectIds([])
-      router.refresh()
+      const projectNameById = new Map(localProjects.map((project) => [project.id, project.name]))
+      const results = await Promise.allSettled(
+        idsToDelete.map(async (projectId) => {
+          await deleteProject(projectId)
+          return projectId
+        })
+      )
+
+      const deletedProjectIds: string[] = []
+      const failedProjectIds: string[] = []
+
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          deletedProjectIds.push(result.value)
+          return
+        }
+        failedProjectIds.push(idsToDelete[index])
+      })
+
+      if (deletedProjectIds.length > 0) {
+        const deletedIdSet = new Set(deletedProjectIds)
+        setLocalProjects((current) => current.filter((project) => !deletedIdSet.has(project.id)))
+        router.refresh()
+      }
+
+      if (failedProjectIds.length > 0) {
+        const failedIdSet = new Set(failedProjectIds)
+        const failedNames = failedProjectIds.map((id) => projectNameById.get(id) ?? id)
+        setSelectedProjectIds((current) => current.filter((id) => failedIdSet.has(id)))
+        window.alert(`Failed to delete: ${failedNames.join(', ')}`)
+      } else {
+        setSelectedProjectIds([])
+      }
     } catch (error) {
       console.error('[ProjectsSection] Failed to delete selected projects', error)
       window.alert('Failed to delete selected projects. Please try again.')

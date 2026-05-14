@@ -121,6 +121,8 @@ export default function ProjectCard({
         type="button"
         onClick={() => onSelect?.(project.id)}
         disabled={disabled}
+        aria-pressed={isSelected}
+        aria-label={`${isSelected ? 'Deselect' : 'Select'} project ${project.name}`}
         className="w-full text-left disabled:cursor-not-allowed"
       >
         {card}
