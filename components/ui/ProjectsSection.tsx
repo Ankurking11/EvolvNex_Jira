@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { deleteProject } from '@/lib/actions'
 import ProjectCard from '@/components/ui/ProjectCard'
 
+const BULK_DELETE_CONCURRENCY = 3
+
 type ProjectListItem = {
   id: string
   name: string
@@ -56,11 +58,31 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
     try {
       const idsToDelete = [...selectedProjectIds]
       const projectNameById = new Map(localProjects.map((project) => [project.id, project.name]))
-      const results = await Promise.allSettled(
-        idsToDelete.map(async (projectId) => {
-          await deleteProject(projectId)
-          return projectId
-        })
+      const results: PromiseSettledResult<string>[] = new Array(idsToDelete.length)
+      let nextIndex = 0
+
+      const runDeleteWorker = async () => {
+        while (true) {
+          const currentIndex = nextIndex++
+          if (currentIndex >= idsToDelete.length) {
+            return
+          }
+
+          const projectId = idsToDelete[currentIndex]
+          try {
+            await deleteProject(projectId)
+            results[currentIndex] = { status: 'fulfilled', value: projectId }
+          } catch (error) {
+            results[currentIndex] = { status: 'rejected', reason: error }
+          }
+        }
+      }
+
+      await Promise.all(
+        Array.from(
+          { length: Math.min(BULK_DELETE_CONCURRENCY, idsToDelete.length) },
+          () => runDeleteWorker()
+        )
       )
 
       const deletedProjectIds: string[] = []
