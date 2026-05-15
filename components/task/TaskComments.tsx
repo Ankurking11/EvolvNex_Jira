@@ -162,8 +162,7 @@ export default function TaskComments({ taskId, users, defaultAuthorId }: TaskCom
     }
   }, [refreshComments, supabase, taskId])
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const handleSubmit = async () => {
     if (!content.trim() || !selectedAuthorId) return
 
     setIsSaving(true)
@@ -198,7 +197,7 @@ export default function TaskComments({ taskId, users, defaultAuthorId }: TaskCom
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-2">
+      <div className="space-y-2">
         <div className="grid gap-2 sm:grid-cols-[160px_minmax(0,1fr)]">
           <select
             value={selectedAuthorId}
@@ -224,14 +223,17 @@ export default function TaskComments({ taskId, users, defaultAuthorId }: TaskCom
             {isRealtimeHealthy ? 'Realtime updates enabled' : 'Automatic refresh enabled'}
           </p>
           <button
-            type="submit"
+            type="button"
+            onClick={() => {
+              void handleSubmit()
+            }}
             disabled={isSaving || !content.trim() || !selectedAuthorId}
             className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSaving ? 'Posting…' : 'Add comment'}
           </button>
         </div>
-      </form>
+      </div>
 
       <div className="space-y-2">
         {isLoading ? (

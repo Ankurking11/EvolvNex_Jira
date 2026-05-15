@@ -5,8 +5,16 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import BoardClient from '@/components/board/BoardClient'
 
-export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ q?: string }>
+}) {
   const { id } = await params
+  const resolvedSearchParams = await searchParams
+  const initialSearchQuery = resolvedSearchParams.q?.trim() ?? ''
 
   let project = null
   try {
@@ -47,6 +55,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         projectId={id}
         projectName={project.name}
         projectDescription={project.description}
+        initialSearchQuery={initialSearchQuery}
       />
     </div>
   )

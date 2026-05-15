@@ -35,6 +35,7 @@ interface BoardClientProps {
   projectId: string
   projectName?: string
   projectDescription?: string | null
+  initialSearchQuery?: string
 }
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
@@ -163,7 +164,14 @@ function updateTasksIfChanged(previous: BoardTask[], next: BoardTask[]) {
   return hasTaskListChanged(previous, next) ? next : previous
 }
 
-export default function BoardClient({ board, users, projectId, projectName, projectDescription }: BoardClientProps) {
+export default function BoardClient({
+  board,
+  users,
+  projectId,
+  projectName,
+  projectDescription,
+  initialSearchQuery = '',
+}: BoardClientProps) {
   const [tasks, setTasks] = useState<BoardTask[]>(board.tasks)
   const [members, setMembers] = useState<BoardUser[]>(board.members)
   const [activeTask, setActiveTask] = useState<BoardTask | null>(null)
@@ -171,7 +179,7 @@ export default function BoardClient({ board, users, projectId, projectName, proj
   const [syncError, setSyncError] = useState<string | null>(null)
   const [isRealtimeHealthy, setIsRealtimeHealthy] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery)
   const [assigneeFilter, setAssigneeFilter] = useState('ALL')
   const [priorityFilter, setPriorityFilter] = useState('ALL')
   const [sortOption, setSortOption] = useState<SortOption>('updated-desc')
@@ -193,6 +201,16 @@ export default function BoardClient({ board, users, projectId, projectName, proj
   useEffect(() => {
     boardTaskIdsRef.current = new Set(tasks.map((task) => task.id))
   }, [tasks])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setSearchQuery((currentQuery) =>
+        currentQuery === initialSearchQuery ? currentQuery : initialSearchQuery
+      )
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [initialSearchQuery])
 
   const refreshBoard = useCallback(async () => {
     if (refreshInFlightRef.current) {
@@ -259,16 +277,11 @@ export default function BoardClient({ board, users, projectId, projectName, proj
   useEffect(() => {
     if (supabase && isRealtimeHealthy) return
 
-    const kickoffRefresh = setTimeout(() => {
-      triggerRefreshBoard()
-    }, 0)
-
     const interval = setInterval(() => {
       triggerRefreshBoard()
     }, POLLING_INTERVAL_MS)
 
     return () => {
-      clearTimeout(kickoffRefresh)
       clearInterval(interval)
     }
   }, [isRealtimeHealthy, supabase, triggerRefreshBoard])

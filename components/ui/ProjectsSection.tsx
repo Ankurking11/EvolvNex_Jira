@@ -22,7 +22,6 @@ interface ProjectsSectionProps {
 }
 
 export default function ProjectsSection({ projects }: ProjectsSectionProps) {
-  const [localProjects, setLocalProjects] = useState(projects)
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
@@ -57,7 +56,7 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
 
     try {
       const idsToDelete = [...selectedProjectIds]
-      const projectNameById = new Map(localProjects.map((project) => [project.id, project.name]))
+      const projectNameById = new Map(projects.map((project) => [project.id, project.name]))
       const results: PromiseSettledResult<string>[] = new Array(idsToDelete.length)
       let nextIndex = 0
 
@@ -97,8 +96,6 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
       })
 
       if (deletedProjectIds.length > 0) {
-        const deletedIdSet = new Set(deletedProjectIds)
-        setLocalProjects((current) => current.filter((project) => !deletedIdSet.has(project.id)))
         router.refresh()
       }
 
@@ -147,7 +144,7 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
         ) : (
           <div className="flex items-center gap-2">
             <p className="text-xs text-gray-500">
-              {localProjects.length} {localProjects.length === 1 ? 'project' : 'projects'}
+              {projects.length} {projects.length === 1 ? 'project' : 'projects'}
             </p>
             <button
               type="button"
@@ -160,7 +157,7 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
         )}
       </div>
 
-      {localProjects.length === 0 ? (
+      {projects.length === 0 ? (
         <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-center">
           <div>
             <h3 className="text-base font-semibold text-gray-800">No projects yet</h3>
@@ -169,7 +166,7 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {localProjects.map((project) => (
+          {projects.map((project) => (
             <ProjectCard
               key={project.id}
               project={project}

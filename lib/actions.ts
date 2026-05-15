@@ -225,6 +225,7 @@ export async function getProjects() {
               select: {
                 id: true,
                 title: true,
+                description: true,
                 status: true,
                 priority: true,
                 updatedAt: true,
@@ -294,6 +295,7 @@ export async function getProjects() {
                 select: {
                   id: true,
                   title: true,
+                  description: true,
                   status: true,
                   priority: true,
                   updatedAt: true,

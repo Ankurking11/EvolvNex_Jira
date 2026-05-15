@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
-import { ReactNode, useMemo, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { BoardUser } from '@/lib/board-types'
 import GlobalCreateButton from '@/components/ui/GlobalCreateButton'
 
@@ -32,11 +32,21 @@ function toTitleCase(value: string) {
 }
 
 export default function AppShell({ children, projects, users }: AppShellProps) {
+  const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const searchDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | number | null>(null)
   const currentView = searchParams.get('view') ?? 'dashboard'
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceTimerRef.current) {
+        window.clearTimeout(searchDebounceTimerRef.current)
+      }
+    }
+  }, [])
 
   const breadcrumbs = useMemo(() => {
     const segments = pathname.split('/').filter(Boolean)
@@ -131,7 +141,30 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
               </svg>
               <input
                 type="search"
-                placeholder="Search"
+                defaultValue={searchParams.get('q') ?? ''}
+                onChange={(event) => {
+                  if (searchDebounceTimerRef.current) {
+                    window.clearTimeout(searchDebounceTimerRef.current)
+                  }
+
+                  const nextValue = event.target.value
+                  searchDebounceTimerRef.current = window.setTimeout(() => {
+                    const normalizedQuery = nextValue.trim()
+                    const currentQuery = searchParams.get('q') ?? ''
+                    if (normalizedQuery === currentQuery) return
+
+                    const nextSearchParams = new URLSearchParams(searchParams.toString())
+                    if (normalizedQuery.length > 0) {
+                      nextSearchParams.set('q', normalizedQuery)
+                    } else {
+                      nextSearchParams.delete('q')
+                    }
+
+                    const nextQuery = nextSearchParams.toString()
+                    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+                  }, 250)
+                }}
+                placeholder="Search projects and tasks"
                 className="w-full rounded-md border border-gray-300 bg-white py-1.5 pl-8 pr-2 text-xs text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
