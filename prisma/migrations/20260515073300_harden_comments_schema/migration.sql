@@ -1,5 +1,3 @@
-BEGIN;
-
 CREATE TABLE IF NOT EXISTS public.comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   task_id UUID NOT NULL,
@@ -8,12 +6,13 @@ CREATE TABLE IF NOT EXISTS public.comments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Keep add-column guards for partially-applied environments where table exists but columns are missing.
 ALTER TABLE public.comments
   ADD COLUMN IF NOT EXISTS id UUID DEFAULT gen_random_uuid(),
   ADD COLUMN IF NOT EXISTS task_id UUID,
   ADD COLUMN IF NOT EXISTS author_id UUID,
   ADD COLUMN IF NOT EXISTS content TEXT,
-  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 ALTER TABLE public.comments
   ALTER COLUMN id SET DEFAULT gen_random_uuid(),
@@ -47,11 +46,32 @@ ALTER TABLE public.comments
     END
   );
 
-DELETE FROM public.comments WHERE task_id IS NULL;
+DO $$
+DECLARE
+  invalid_task_count INTEGER;
+BEGIN
+  SELECT COUNT(*)
+  INTO invalid_task_count
+  FROM public.comments
+  WHERE task_id IS NULL;
+
+  IF invalid_task_count > 0 THEN
+    RAISE EXCEPTION 'comments migration aborted: found % row(s) with null/invalid task_id. Resolve data manually before retrying.', invalid_task_count
+      USING HINT = 'Inspect rows with: SELECT id, task_id, author_id, created_at FROM public.comments WHERE task_id IS NULL LIMIT 50;';
+  END IF;
+END $$;
 
 UPDATE public.comments
 SET content = ''
 WHERE content IS NULL;
+
+UPDATE public.comments
+SET id = gen_random_uuid()
+WHERE id IS NULL;
+
+UPDATE public.comments
+SET created_at = NOW()
+WHERE created_at IS NULL;
 
 ALTER TABLE public.comments
   ALTER COLUMN id SET NOT NULL,
@@ -71,15 +91,6 @@ BEGIN
   END IF;
 END $$;
 
-UPDATE public.comments c
-SET author_id = NULL
-WHERE author_id IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1
-    FROM public.users u
-    WHERE u.id = c.author_id
-  );
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -98,11 +109,18 @@ BEGIN
     FROM pg_constraint
     WHERE conname = 'comments_author_id_fkey'
   ) THEN
+    UPDATE public.comments c
+    SET author_id = NULL
+    WHERE author_id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.users u
+        WHERE u.id = c.author_id
+      );
+
     ALTER TABLE public.comments
       ADD CONSTRAINT comments_author_id_fkey
       FOREIGN KEY (author_id) REFERENCES public.users(id)
       ON DELETE SET NULL ON UPDATE CASCADE;
   END IF;
 END $$;
-
-COMMIT;

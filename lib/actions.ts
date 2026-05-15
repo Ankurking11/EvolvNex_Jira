@@ -174,7 +174,7 @@ function isMissingCommentsTableError(error: unknown) {
   return false
 }
 
-async function logCommentsTableDiagnostics(source: string) {
+async function logCommentsTableDiagnostics(diagnosticSource: string) {
   try {
     const [tableRows, columnRows, fkRows] = await Promise.all([
       prisma.$queryRaw<Array<{ table_schema: string; table_name: string }>>`
@@ -201,13 +201,13 @@ async function logCommentsTableDiagnostics(source: string) {
     ])
 
     console.error('[comments-schema-diagnostics]', {
-      source,
+      diagnosticSource,
       tableExists: tableRows.length > 0,
       columns: columnRows,
       foreignKeys: fkRows,
     })
   } catch (diagnosticError) {
-    console.error('[comments-schema-diagnostics] failed', { source }, diagnosticError)
+    console.error('[comments-schema-diagnostics] failed', { diagnosticSource }, diagnosticError)
   }
 }
 
