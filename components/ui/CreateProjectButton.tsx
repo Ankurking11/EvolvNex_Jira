@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createProject } from '@/lib/actions'
 
 export default function CreateProjectButton() {
@@ -9,6 +10,7 @@ export default function CreateProjectButton() {
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,6 +22,7 @@ export default function CreateProjectButton() {
       setName('')
       setDescription('')
       setIsOpen(false)
+      router.refresh()
     } catch (err) {
       console.error('[CreateProjectButton] Failed to create project', err)
       setError('Failed to create project. Please try again.')
