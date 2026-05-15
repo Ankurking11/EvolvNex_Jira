@@ -78,10 +78,12 @@ function serializeComment(comment: {
   }
 }
 
-async function hasCommentsTable() {
-  const cached = readTableAvailabilityCache(commentsTableCache)
-  if (cached !== null) {
-    return cached
+async function hasCommentsTable(options?: { forceRefresh?: boolean }) {
+  if (!options?.forceRefresh) {
+    const cached = readTableAvailabilityCache(commentsTableCache)
+    if (cached !== null) {
+      return cached
+    }
   }
 
   try {
@@ -97,6 +99,14 @@ async function hasCommentsTable() {
     commentsTableCache = writeTableAvailabilityCache(false)
     return false
   }
+}
+
+async function hasCommentsTableWithRetry() {
+  if (await hasCommentsTable()) {
+    return true
+  }
+
+  return hasCommentsTable({ forceRefresh: true })
 }
 
 async function hasProjectMembersTable() {
@@ -148,7 +158,13 @@ function isMissingCommentsTableError(error: unknown) {
   }
 
   if (error instanceof Error) {
-    return error.message.includes('public.comments') || error.message.includes('comments')
+    const message = error.message.toLowerCase()
+    return (
+      message.includes('public.comments') ||
+      message.includes('relation "comments"') ||
+      message.includes("table 'comments'") ||
+      message.includes('table `comments`')
+    )
   }
 
   return false
@@ -547,11 +563,7 @@ export async function updateProjectMembers(projectId: string, userIds: string[])
 
 export async function getTaskComments(taskId: string) {
   try {
-    if (!(await hasCommentsTable())) {
-      commentsTableCache = null
-    }
-
-    if (!(await hasCommentsTable())) {
+    if (!(await hasCommentsTableWithRetry())) {
       return []
     }
 
@@ -577,11 +589,7 @@ export async function createTaskComment(data: { taskId: string; authorId: string
   }
 
   try {
-    if (!(await hasCommentsTable())) {
-      commentsTableCache = null
-    }
-
-    if (!(await hasCommentsTable())) {
+    if (!(await hasCommentsTableWithRetry())) {
       throw new Error('Comments are unavailable until the comments migration is applied.')
     }
 
