@@ -39,7 +39,8 @@ export default async function DashboardPage({
       ? requestedView
       : 'dashboard'
 
-  const [projects, users] = await Promise.all([getProjects(), getUsers()])
+  const shouldLoadUsers = view === 'my-tasks' || view === 'settings'
+  const [projects, users] = await Promise.all([getProjects(), shouldLoadUsers ? getUsers() : Promise.resolve([])])
   const filteredProjects =
     searchQuery.length === 0
       ? projects

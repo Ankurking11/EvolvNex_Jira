@@ -137,6 +137,23 @@ function isMissingProjectMembersTableError(error: unknown) {
   return false
 }
 
+function isMissingCommentsTableError(error: unknown) {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2021' &&
+    typeof error.meta?.table === 'string' &&
+    error.meta.table.includes('comments')
+  ) {
+    return true
+  }
+
+  if (error instanceof Error) {
+    return error.message.includes('public.comments') || error.message.includes('comments')
+  }
+
+  return false
+}
+
 /**
  * Keeps dashboard aggregate cards and the project board page in sync after task mutations.
  */
@@ -531,6 +548,10 @@ export async function updateProjectMembers(projectId: string, userIds: string[])
 export async function getTaskComments(taskId: string) {
   try {
     if (!(await hasCommentsTable())) {
+      commentsTableCache = null
+    }
+
+    if (!(await hasCommentsTable())) {
       return []
     }
 
@@ -556,6 +577,10 @@ export async function createTaskComment(data: { taskId: string; authorId: string
   }
 
   try {
+    if (!(await hasCommentsTable())) {
+      commentsTableCache = null
+    }
+
     if (!(await hasCommentsTable())) {
       throw new Error('Comments are unavailable until the comments migration is applied.')
     }
@@ -589,6 +614,10 @@ export async function createTaskComment(data: { taskId: string; authorId: string
       authorId: comment.authorId,
     })
   } catch (error) {
+    if (isMissingCommentsTableError(error)) {
+      commentsTableCache = writeTableAvailabilityCache(false)
+      throw new Error('Comments are unavailable until the comments migration is applied.')
+    }
     console.error('[createTaskComment] Failed to create comment', { taskId: data.taskId }, error)
     throw error
   }
