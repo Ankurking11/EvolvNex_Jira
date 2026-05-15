@@ -203,7 +203,13 @@ export default function BoardClient({
   }, [tasks])
 
   useEffect(() => {
-    setSearchQuery(initialSearchQuery)
+    const timeoutId = window.setTimeout(() => {
+      setSearchQuery((currentQuery) =>
+        currentQuery === initialSearchQuery ? currentQuery : initialSearchQuery
+      )
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [initialSearchQuery])
 
   const refreshBoard = useCallback(async () => {

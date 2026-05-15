@@ -49,7 +49,7 @@ export default async function DashboardPage({
           const taskMatches = (project.board?.tasks ?? []).some(
             (task) =>
               task.title.toLowerCase().includes(searchQuery) ||
-              (task.description?.toLowerCase().includes(searchQuery) ?? false)
+              task.description?.toLowerCase().includes(searchQuery)
           )
           return projectNameMatches || projectDescriptionMatches || taskMatches
         })

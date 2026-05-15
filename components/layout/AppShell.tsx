@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ReactNode, useEffect, useMemo, useState } from 'react'
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { BoardUser } from '@/lib/board-types'
 import GlobalCreateButton from '@/components/ui/GlobalCreateButton'
 
@@ -37,32 +37,16 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
   const searchParams = useSearchParams()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [globalSearchQuery, setGlobalSearchQuery] = useState(searchParams.get('q') ?? '')
+  const searchDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | number | null>(null)
   const currentView = searchParams.get('view') ?? 'dashboard'
 
   useEffect(() => {
-    setGlobalSearchQuery(searchParams.get('q') ?? '')
-  }, [searchParams])
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const normalizedQuery = globalSearchQuery.trim()
-      const currentQuery = searchParams.get('q') ?? ''
-      if (normalizedQuery === currentQuery) return
-
-      const nextSearchParams = new URLSearchParams(searchParams.toString())
-      if (normalizedQuery.length > 0) {
-        nextSearchParams.set('q', normalizedQuery)
-      } else {
-        nextSearchParams.delete('q')
+    return () => {
+      if (searchDebounceTimerRef.current) {
+        window.clearTimeout(searchDebounceTimerRef.current)
       }
-
-      const nextQuery = nextSearchParams.toString()
-      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
-    }, 250)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [globalSearchQuery, pathname, router, searchParams])
+    }
+  }, [])
 
   const breadcrumbs = useMemo(() => {
     const segments = pathname.split('/').filter(Boolean)
@@ -157,8 +141,29 @@ export default function AppShell({ children, projects, users }: AppShellProps) {
               </svg>
               <input
                 type="search"
-                value={globalSearchQuery}
-                onChange={(event) => setGlobalSearchQuery(event.target.value)}
+                defaultValue={searchParams.get('q') ?? ''}
+                onChange={(event) => {
+                  if (searchDebounceTimerRef.current) {
+                    window.clearTimeout(searchDebounceTimerRef.current)
+                  }
+
+                  const nextValue = event.target.value
+                  searchDebounceTimerRef.current = window.setTimeout(() => {
+                    const normalizedQuery = nextValue.trim()
+                    const currentQuery = searchParams.get('q') ?? ''
+                    if (normalizedQuery === currentQuery) return
+
+                    const nextSearchParams = new URLSearchParams(searchParams.toString())
+                    if (normalizedQuery.length > 0) {
+                      nextSearchParams.set('q', normalizedQuery)
+                    } else {
+                      nextSearchParams.delete('q')
+                    }
+
+                    const nextQuery = nextSearchParams.toString()
+                    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+                  }, 250)
+                }}
                 placeholder="Search projects and tasks"
                 className="w-full rounded-md border border-gray-300 bg-white py-1.5 pl-8 pr-2 text-xs text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
