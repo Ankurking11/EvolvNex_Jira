@@ -25,10 +25,11 @@ function getCommentCount(task: unknown) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>
+  searchParams: Promise<{ view?: string; q?: string }>
 }) {
   const resolvedSearchParams = await searchParams
   const requestedView = resolvedSearchParams.view
+  const searchQuery = (resolvedSearchParams.q ?? '').trim().toLowerCase()
   const view: DashboardView =
     requestedView === 'projects' ||
     requestedView === 'my-tasks' ||
@@ -39,7 +40,21 @@ export default async function DashboardPage({
       : 'dashboard'
 
   const [projects, users] = await Promise.all([getProjects(), getUsers()])
-  const allTasks = projects.flatMap((project) =>
+  const filteredProjects =
+    searchQuery.length === 0
+      ? projects
+      : projects.filter((project) => {
+          const projectNameMatches = project.name.toLowerCase().includes(searchQuery)
+          const projectDescriptionMatches = project.description?.toLowerCase().includes(searchQuery) ?? false
+          const taskMatches = (project.board?.tasks ?? []).some(
+            (task) =>
+              task.title.toLowerCase().includes(searchQuery) ||
+              (task.description?.toLowerCase().includes(searchQuery) ?? false)
+          )
+          return projectNameMatches || projectDescriptionMatches || taskMatches
+        })
+
+  const allTasks = filteredProjects.flatMap((project) =>
     (project.board?.tasks ?? []).map((task) => ({
       ...task,
       _count: {
@@ -75,7 +90,7 @@ export default async function DashboardPage({
       user.id,
       {
         assignedCount: allTasks.filter((task) => task.assigneeId === user.id).length,
-        memberProjects: projects.filter((project) => project.members.some((member) => member.userId === user.id)).length,
+        memberProjects: filteredProjects.filter((project) => project.members.some((member) => member.userId === user.id)).length,
       },
     ])
   )
@@ -93,7 +108,7 @@ export default async function DashboardPage({
       <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded-lg border border-gray-200 bg-white p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Projects</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{projects.length}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{filteredProjects.length}</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">To Do</p>
@@ -119,7 +134,7 @@ export default async function DashboardPage({
       {(view === 'dashboard' || view === 'projects') && (
         <>
           {summarySection}
-          <ProjectsSection projects={projects} />
+          <ProjectsSection projects={filteredProjects} />
         </>
       )}
 
@@ -240,7 +255,7 @@ export default async function DashboardPage({
               <p className="text-xs text-gray-500">Delivery and throughput snapshot</p>
             </div>
             <div className="grid gap-3 lg:grid-cols-2">
-              {projects.map((project) => {
+              {filteredProjects.map((project) => {
                 const projectTasks = project.board?.tasks ?? []
                 const completedCount = projectTasks.filter((task) => task.status === 'DONE').length
                 const completionRate = projectTasks.length > 0 ? Math.round((completedCount / projectTasks.length) * 100) : 0

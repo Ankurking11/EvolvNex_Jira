@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { deleteProject } from '@/lib/actions'
 import ProjectCard from '@/components/ui/ProjectCard'
@@ -27,6 +27,10 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    setLocalProjects(projects)
+  }, [projects])
 
   const selectedIdSet = useMemo(() => new Set(selectedProjectIds), [selectedProjectIds])
 

@@ -22,12 +22,6 @@ const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
   MEDIUM: { label: 'Medium', className: 'bg-amber-50 text-amber-700 border-amber-200' },
   LOW: { label: 'Low', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 }
-const STATUS_LABELS: Record<string, string> = {
-  TODO: 'To Do',
-  IN_PROGRESS: 'In Progress',
-  DONE: 'Done',
-}
-
 function getInitials(name: string) {
   return name
     .split(' ')
@@ -202,7 +196,6 @@ function TaskCard({ task, users, onUpdate, onDelete, isDragging }: TaskCardProps
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">{STATUS_LABELS[task.status] ?? task.status}</span>
             <span className="inline-flex items-center gap-1" aria-label="Comments count">
               <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path d="M4 4h12a2 2 0 012 2v7a2 2 0 01-2 2H9.414L6 18.414A1 1 0 014.293 17.7L4.586 15H4a2 2 0 01-2-2V6a2 2 0 012-2Z" />
