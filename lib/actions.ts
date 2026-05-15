@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from './prisma'
-import { revalidatePath, unstable_cache, revalidateTag } from 'next/cache'
+import { revalidatePath, unstable_cache, revalidateTag, updateTag } from 'next/cache'
 import { BoardComment, BoardTask, BoardUser } from './board-types'
 import { Prisma } from '@prisma/client'
 
@@ -92,10 +92,14 @@ async function hasCommentsTable(options?: { forceRefresh?: boolean }) {
     `
 
     const exists = result[0]?.exists ?? false
+    if (!exists) {
+      await logCommentsTableDiagnostics('hasCommentsTable:not_found')
+    }
     commentsTableCache = writeTableAvailabilityCache(exists)
     return exists
   } catch (error) {
     console.warn('[hasCommentsTable] Failed to inspect comments table availability', error)
+    await logCommentsTableDiagnostics('hasCommentsTable:inspect_failed')
     commentsTableCache = writeTableAvailabilityCache(false)
     return false
   }
@@ -168,6 +172,43 @@ function isMissingCommentsTableError(error: unknown) {
   }
 
   return false
+}
+
+async function logCommentsTableDiagnostics(source: string) {
+  try {
+    const [tableRows, columnRows, fkRows] = await Promise.all([
+      prisma.$queryRaw<Array<{ table_schema: string; table_name: string }>>`
+        SELECT table_schema, table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'comments'
+      `,
+      prisma.$queryRaw<
+        Array<{ column_name: string; data_type: string; udt_name: string; is_nullable: string; column_default: string | null }>
+      >`
+        SELECT column_name, data_type, udt_name, is_nullable, column_default
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'comments'
+        ORDER BY ordinal_position
+      `,
+      prisma.$queryRaw<Array<{ conname: string; definition: string }>>`
+        SELECT c.conname, pg_get_constraintdef(c.oid) AS definition
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = 'public' AND t.relname = 'comments' AND c.contype = 'f'
+        ORDER BY c.conname
+      `,
+    ])
+
+    console.error('[comments-schema-diagnostics]', {
+      source,
+      tableExists: tableRows.length > 0,
+      columns: columnRows,
+      foreignKeys: fkRows,
+    })
+  } catch (diagnosticError) {
+    console.error('[comments-schema-diagnostics] failed', { source }, diagnosticError)
+  }
 }
 
 /**
@@ -590,6 +631,7 @@ export async function createTaskComment(data: { taskId: string; authorId: string
 
   try {
     if (!(await hasCommentsTableWithRetry())) {
+      await logCommentsTableDiagnostics('createTaskComment:preflight_false')
       throw new Error('Comments are unavailable until the comments migration is applied.')
     }
 
@@ -820,7 +862,7 @@ export async function createProject(data: { name: string; description?: string }
         },
       },
     })
-    revalidateTag('projects', 'max')
+    updateTag('projects')
     revalidateProjectAndDashboard(project.id)
     return project
   } catch (error) {
